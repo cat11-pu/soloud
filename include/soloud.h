@@ -272,8 +272,12 @@ namespace SoLoud
 		result seek(handle aVoiceHandle, time aSeconds);
 		// Stop the sound.
 		void stop(handle aVoiceHandle);
+		// Stop the sound with a millisecond-resolution fade-out to avoid clicks/pops.
+		void stop(handle aVoiceHandle, time aFadeoutTime);
 		// Stop all voices.
 		void stopAll();
+		// Stop all voices with a millisecond-resolution fade-out to avoid clicks/pops.
+		void stopAll(time aFadeoutTime);
 		// Stop all voices that play this sound source
 		void stopAudioSource(AudioSource &aSound);
 		// Count voices that play this audio source
@@ -341,6 +345,22 @@ namespace SoLoud
 		void setGlobalVolume(float aVolume);
 		// Set the post clip scaler value
 		void setPostClipScaler(float aScaler);
+		// Set the length of the fade-in applied to every newly triggered voice, in milliseconds. 0 disables.
+		void setVoiceFadeInMs(unsigned int aMs);
+		// Get the fade-in length applied to every newly triggered voice, in milliseconds.
+		unsigned int getVoiceFadeInMs() const;
+		// Set the default fade-out length used when stopping a voice, in milliseconds.
+		void setStopFadeOutMs(unsigned int aMs);
+		// Get the default stop fade-out length, in milliseconds.
+		unsigned int getStopFadeOutMs() const;
+		// Enable or disable the per-bus look-ahead limiter that prevents bus clipping.
+		void setBusLimiter(bool aEnable);
+		// Query whether the per-bus look-ahead limiter is enabled.
+		bool getBusLimiter() const;
+		// Set the per-bus limiter ceiling (linear gain, must be > 0 and <= 1).
+		result setBusLimiterCeiling(float aCeiling);
+		// Get the per-bus limiter ceiling.
+		float getBusLimiterCeiling() const;
 		// Set the main resampler
 		void setMainResampler(unsigned int aResampler);
 		// Set the pause state
@@ -465,7 +485,7 @@ namespace SoLoud
 		// Update list of active voices
 		void calcActiveVoices_internal();
 		// Map resample buffers to active voices
-		void mapResampleBuffers_internal();
+		void mapResampleBuffers_internal(bool aClearMappedBuffers);
 		// Perform mixing for a specific bus
 		void mixBus_internal(float *aBuffer, unsigned int aSamplesToRead, unsigned int aBufferSize, float *aScratch, unsigned int aBus, float aSamplerate, unsigned int aChannels, unsigned int aResampler);
 		// Find a free voice, stopping the oldest if no free voice is found.
@@ -476,6 +496,14 @@ namespace SoLoud
 		handle getHandleFromVoice_internal(unsigned int aVoice) const;
 		// Stop voice (not handle).
 		void stopVoice_internal(unsigned int aVoice);
+		// Schedule a voice for fade-out and actual removal once silent.
+		void scheduleStopVoice_internal(unsigned int aVoice, unsigned int aFadeSamples);
+		// Advance the attack/release envelope of a voice over one mix block.
+		void updateVoiceEnvelope_internal(AudioSourceInstance *aVoice, unsigned int aSamples);
+		// Apply the per-voice attack/release envelope to a scratch channel block.
+		void applyVoiceEnvelope_internal(AudioSourceInstance *aVoice, float *aScratch, unsigned int aBufferSize, unsigned int aVoiceChannels, unsigned int aSamples);
+		// Smoothly limit a mixed bus block so its output never exceeds the limiter ceiling.
+		void limitBusBlock_internal(float *aBuffer, unsigned int aSamples, unsigned int aBufferSize, unsigned int aChannels, float &aGainState);
 		// Set voice (not handle) pan.
 		void setVoicePan_internal(unsigned int aVoice, float aPan);
 		// Set voice (not handle) relative play speed.
@@ -536,6 +564,16 @@ namespace SoLoud
 		unsigned int mFlags;
 		// Global volume. Applied before clipping.
 		float mGlobalVolume;
+		// Fade-in length for newly triggered voices, in milliseconds.
+		unsigned int mVoiceFadeInMs;
+		// Default stop fade-out length, in milliseconds.
+		unsigned int mStopFadeOutMs;
+		// Whether the per-bus look-ahead limiter is enabled.
+		bool mBusLimiterEnabled;
+		// Ceiling of the per-bus limiter, linear gain.
+		float mBusLimiterCeiling;
+		// Smoothed gain state of the limiter on the root (bus 0).
+		float mRootBusLimiterGain;
 		// Post-clip scaler. Applied after clipping.
 		float mPostClipScaler;
 		// Current play index. Used to create audio handles.

@@ -37,6 +37,8 @@ namespace SoLoud
 		Bus *mParent;
 		unsigned int mScratchSize;
 		AlignedFloatBuffer mScratch;
+		// Smoothed gain state for this bus' look-ahead limiter.
+		float mLimiterGain;
 
 		// Approximate volume for channels.
 		float mVisualizationChannelVolume[MAX_CHANNELS];

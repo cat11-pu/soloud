@@ -122,6 +122,11 @@ namespace SoLoud
 		mStreamTime = 0;
 		mLastClockedTime = 0;
 		mAudioSourceID = 1;
+		mVoiceFadeInMs = 5;
+		mStopFadeOutMs = 10;
+		mBusLimiterEnabled = true;
+		mBusLimiterCeiling = 0.99f;
+		mRootBusLimiterGain = 1.0f;
 		mBackendString = 0;
 		mBackendID = 0;
 		mActiveVoiceDirty = true;
@@ -1050,6 +1055,165 @@ namespace SoLoud
 
 
 
+	void Soloud::scheduleStopVoice_internal(unsigned int aVoice, unsigned int aFadeSamples)
+	{
+		SOLOUD_ASSERT(aVoice < VOICE_COUNT);
+		SOLOUD_ASSERT(mInsideAudioThreadMutex);
+		if (mVoice[aVoice] == 0)
+			return;
+
+		AudioSourceInstance *voice = mVoice[aVoice];
+
+		// Paused voices produce no samples, so there is nothing to ramp down.
+		if (voice->mFlags & AudioSourceInstance::PAUSED || aFadeSamples == 0)
+		{
+			stopVoice_internal(aVoice);
+			return;
+		}
+
+		// Repeated stop requests keep the earliest, shortest fade in flight.
+		if (voice->mReleaseSamplesTotal == 0 || aFadeSamples < voice->mReleaseSamplesTotal)
+		{
+			voice->mReleaseSamplesTotal = aFadeSamples;
+			voice->mReleaseSamplesDone = 0;
+		}
+		mActiveVoiceDirty = true;
+	}
+
+	void Soloud::updateVoiceEnvelope_internal(AudioSourceInstance *aVoice, unsigned int aSamples)
+	{
+		SOLOUD_ASSERT(mInsideAudioThreadMutex);
+
+		float attackStart = 1.0f;
+		if (aVoice->mAttackSamplesTotal > 0 && aVoice->mAttackSamplesDone < aVoice->mAttackSamplesTotal)
+		{
+			attackStart = (float)aVoice->mAttackSamplesDone / (float)aVoice->mAttackSamplesTotal;
+		}
+
+		float releaseStart = 1.0f;
+		if (aVoice->mReleaseSamplesTotal > 0)
+		{
+			releaseStart = 1.0f - (float)aVoice->mReleaseSamplesDone / (float)aVoice->mReleaseSamplesTotal;
+		}
+
+		aVoice->mEnvelopeGainStart = attackStart * releaseStart;
+
+		float attackEnd = 1.0f;
+		if (aVoice->mAttackSamplesTotal > 0 && aVoice->mAttackSamplesDone < aVoice->mAttackSamplesTotal)
+		{
+			unsigned int end = aVoice->mAttackSamplesDone + aSamples;
+			if (end > aVoice->mAttackSamplesTotal)
+				end = aVoice->mAttackSamplesTotal;
+			attackEnd = (float)end / (float)aVoice->mAttackSamplesTotal;
+			aVoice->mAttackSamplesDone = end;
+		}
+
+		float releaseEnd = 1.0f;
+		if (aVoice->mReleaseSamplesTotal > 0)
+		{
+			unsigned int end = aVoice->mReleaseSamplesDone + aSamples;
+			if (end > aVoice->mReleaseSamplesTotal)
+				end = aVoice->mReleaseSamplesTotal;
+			releaseEnd = 1.0f - (float)end / (float)aVoice->mReleaseSamplesTotal;
+			aVoice->mReleaseSamplesDone = end;
+		}
+
+		// End-of-block gain; applyVoiceEnvelope_internal() ramps per sample towards it.
+		aVoice->mEnvelopeGain = attackEnd * releaseEnd;
+	}
+
+	void Soloud::applyVoiceEnvelope_internal(AudioSourceInstance *aVoice, float *aScratch, unsigned int aBufferSize, unsigned int aVoiceChannels, unsigned int aSamples)
+	{
+		float start = aVoice->mEnvelopeGainStart;
+		float end = aVoice->mEnvelopeGain;
+		if (start >= 1.0f - 1.0e-7f && end >= 1.0f - 1.0e-7f)
+			return;
+
+		float g = start;
+		float gd = (end - start) / (float)aSamples;
+		for (unsigned int c = 0; c < aVoiceChannels; c++)
+		{
+			float gc = g;
+			float *data = aScratch + c * aBufferSize;
+			for (unsigned int k = 0; k < aSamples; k++)
+			{
+				gc += gd;
+				data[k] *= gc;
+			}
+		}
+	}
+
+	void Soloud::limitBusBlock_internal(float *aBuffer, unsigned int aSamples, unsigned int aBufferSize, unsigned int aChannels, float &aGainState)
+	{
+		if (!mBusLimiterEnabled)
+			return;
+
+		// Look-ahead: find the peak of the whole block before touching it.
+		float peak = 0.0f;
+		for (unsigned int c = 0; c < aChannels; c++)
+		{
+			const float *data = aBuffer + c * aBufferSize;
+			for (unsigned int k = 0; k < aSamples; k++)
+			{
+				float v = fabsf(data[k]);
+				if (v > peak) peak = v;
+			}
+		}
+
+		// Target gain keeps the whole block at or below the ceiling.
+		float target = 1.0f;
+		if (peak > 1.0e-7f)
+		{
+			float needed = mBusLimiterCeiling / peak;
+			if (needed < target)
+				target = needed;
+		}
+
+		// Gain end point for this block. Gain reduction (attack) is applied
+		// immediately within this look-ahead block so that no single sample
+		// can exceed the ceiling. Recovery (release) is rate-limited to avoid
+		// audible pumping/volume jumps when loud voices stop.
+		const float releasePerBlock = 0.02f; // ~50 blocks to recover at 512 samples
+		float gainEnd;
+		if (target < aGainState)
+		{
+			// Need to attenuate: snap to the safe target for this block.
+			gainEnd = target;
+		}
+		else
+		{
+			gainEnd = aGainState + releasePerBlock;
+			if (gainEnd > target)
+				gainEnd = target;
+			if (gainEnd > 1.0f)
+				gainEnd = 1.0f;
+		}
+
+		// Every point of the in-block ramp must be safe. When attenuation is
+		// required we start from the safe gain, which guarantees the whole
+		// block stays at or below the ceiling.
+		float gainStart = aGainState;
+		if (target < gainStart)
+			gainStart = target;
+		if (peak * gainStart > mBusLimiterCeiling && peak > 1.0e-7f)
+			gainStart = mBusLimiterCeiling / peak;
+
+		// Per-sample linear ramp shared by all channels.
+		for (unsigned int c = 0; c < aChannels; c++)
+		{
+			float gc = gainStart;
+			float gd = (gainEnd - gainStart) / (float)aSamples;
+			float *data = aBuffer + c * aBufferSize;
+			for (unsigned int k = 0; k < aSamples; k++)
+			{
+				gc += gd;
+				data[k] *= gc;
+			}
+		}
+
+		aGainState = gainEnd;
+	}
+
 	void panAndExpand(AudioSourceInstance *aVoice, float *aBuffer, unsigned int aSamplesToRead, unsigned int aBufferSize, float *aScratch, unsigned int aChannels)
 	{
 #ifdef SOLOUD_SSE_INTRINSICS
@@ -1791,7 +1955,17 @@ namespace SoLoud
 				}
 				
 				// Handle panning and channel expansion (and/or shrinking)
+				updateVoiceEnvelope_internal(voice, aSamplesToRead);
+				applyVoiceEnvelope_internal(voice, aScratch, aBufferSize, voice->mChannels, aSamplesToRead);
 				panAndExpand(voice, aBuffer, aSamplesToRead, aBufferSize, aScratch, aChannels);
+
+				// Fade-out finished: remove the voice after its last block reached silence.
+				if (voice->mReleaseSamplesTotal > 0 &&
+					voice->mReleaseSamplesDone >= voice->mReleaseSamplesTotal)
+				{
+					stopVoice_internal(mActiveVoice[i]);
+					continue;
+				}
 
 				// clear voice if the sound is over
 				if (!(voice->mFlags & (AudioSourceInstance::LOOPING | AudioSourceInstance::DISABLE_AUTOSTOP)) && voice->hasEnded())
@@ -1909,9 +2083,27 @@ namespace SoLoud
 				}
 			}
 		}
+
+		// Per-bus limiting. Sub-buses carry their own smoothed gain state on
+		// their BusInstance; the root bus uses the Soloud member directly.
+		if (mBusLimiterEnabled)
+		{
+			float *gainState = &mRootBusLimiterGain;
+			if (aBus != 0)
+			{
+				int busVoice = (aBus & 0xfff) - 1;
+				if (busVoice >= 0 && busVoice < VOICE_COUNT && mVoice[busVoice])
+				{
+					BusInstance *busInstance = dynamic_cast<BusInstance *>(mVoice[busVoice]);
+					if (busInstance)
+						gainState = &busInstance->mLimiterGain;
+				}
+			}
+			limitBusBlock_internal(aBuffer, aSamplesToRead, aBufferSize, aChannels, *gainState);
+		}
 	}
 
-	void Soloud::mapResampleBuffers_internal()
+	void Soloud::mapResampleBuffers_internal(bool aClearMappedBuffers)
 	{
 		SOLOUD_ASSERT(mMaxActiveVoices < 256);
 		char live[256];
@@ -1956,8 +2148,14 @@ namespace SoLoud
 				mResampleDataOwner[found] = mVoice[mActiveVoice[i]];
 				mResampleDataOwner[found]->mResampleData[0] = mResampleData[found * 2 + 0];
 				mResampleDataOwner[found]->mResampleData[1] = mResampleData[found * 2 + 1];
-				memset(mResampleDataOwner[found]->mResampleData[0], 0, sizeof(float) * SAMPLE_GRANULARITY * MAX_CHANNELS);
-				memset(mResampleDataOwner[found]->mResampleData[1], 0, sizeof(float) * SAMPLE_GRANULARITY * MAX_CHANNELS);
+				if (aClearMappedBuffers)
+				{
+					// Only safe for genuinely new voices. A remap triggered by a
+					// fade-out flag must preserve the ping-pong resampler history,
+					// otherwise every surviving voice gets a block-boundary step.
+					memset(mResampleDataOwner[found]->mResampleData[0], 0, sizeof(float) * SAMPLE_GRANULARITY * MAX_CHANNELS);
+					memset(mResampleDataOwner[found]->mResampleData[1], 0, sizeof(float) * SAMPLE_GRANULARITY * MAX_CHANNELS);
+				}
 				latestfree = found + 1;
 			}
 		}
@@ -1995,7 +2193,26 @@ namespace SoLoud
 		{
 			// everything is audible, early out
 			mActiveVoiceCount = candidates;
-			mapResampleBuffers_internal();
+			// Only clear resample buffers when a voice genuinely has no
+			// buffer owner yet. Pure state changes (e.g. starting a fade-out)
+			// must keep the existing ping-pong history intact.
+			bool unmappedVoice = false;
+			for (unsigned int v = 0; v < candidates && !unmappedVoice; v++)
+			{
+				AudioSourceInstance *voice = mVoice[mActiveVoice[v]];
+				bool owned = false;
+				for (unsigned int slot = 0; slot < mMaxActiveVoices; slot++)
+				{
+					if (mResampleDataOwner[slot] == voice)
+					{
+						owned = true;
+						break;
+					}
+				}
+				if (!owned)
+					unmappedVoice = true;
+			}
+			mapResampleBuffers_internal(unmappedVoice);
 			return;
 		}
 
@@ -2049,7 +2266,7 @@ namespace SoLoud
 			len = stack[--pos];          
 		}	
 		// TODO: should the rest of the voices be flagged INAUDIBLE?
-		mapResampleBuffers_internal();
+		mapResampleBuffers_internal(true);
 	}
 
 	void Soloud::mix_internal(unsigned int aSamples, unsigned int aStride)
@@ -2184,7 +2401,9 @@ namespace SoLoud
 					if (mVoice[i]->mStopScheduler.mActive == -1)
 					{
 						mVoice[i]->mStopScheduler.mActive = 0;
-						stopVoice_internal(i);
+						unsigned int fadeSamples =
+							(unsigned int)((double)mStopFadeOutMs * 0.001 * (double)mSamplerate);
+						scheduleStopVoice_internal(i, fadeSamples);
 					}
 				}
 			}

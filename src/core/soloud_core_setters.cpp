@@ -33,6 +33,57 @@ namespace SoLoud
 		mPostClipScaler = aScaler;
 	}
 
+	void Soloud::setVoiceFadeInMs(unsigned int aMs)
+	{
+		lockAudioMutex_internal();
+		mVoiceFadeInMs = aMs;
+		unlockAudioMutex_internal();
+	}
+
+	unsigned int Soloud::getVoiceFadeInMs() const
+	{
+		return mVoiceFadeInMs;
+	}
+
+	void Soloud::setStopFadeOutMs(unsigned int aMs)
+	{
+		lockAudioMutex_internal();
+		mStopFadeOutMs = aMs;
+		unlockAudioMutex_internal();
+	}
+
+	unsigned int Soloud::getStopFadeOutMs() const
+	{
+		return mStopFadeOutMs;
+	}
+
+	void Soloud::setBusLimiter(bool aEnable)
+	{
+		lockAudioMutex_internal();
+		mBusLimiterEnabled = aEnable;
+		unlockAudioMutex_internal();
+	}
+
+	bool Soloud::getBusLimiter() const
+	{
+		return mBusLimiterEnabled;
+	}
+
+	result Soloud::setBusLimiterCeiling(float aCeiling)
+	{
+		if (aCeiling <= 0.0f || aCeiling > 1.0f)
+			return INVALID_PARAMETER;
+		lockAudioMutex_internal();
+		mBusLimiterCeiling = aCeiling;
+		unlockAudioMutex_internal();
+		return SO_NO_ERROR;
+	}
+
+	float Soloud::getBusLimiterCeiling() const
+	{
+		return mBusLimiterCeiling;
+	}
+
 	void Soloud::setMainResampler(unsigned int aResampler)
 	{
 		if (aResampler <= RESAMPLER_CATMULLROM)

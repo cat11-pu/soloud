@@ -31,6 +31,7 @@ namespace SoLoud
 	BusInstance::BusInstance(Bus *aParent)
 	{
 		mParent = aParent;
+		mLimiterGain = 1.0f;
 		mFlags |= PROTECTED | INAUDIBLE_TICK;		
 		for (int i = 0; i < MAX_CHANNELS; i++)
 			mVisualizationChannelVolume[i] = 0;

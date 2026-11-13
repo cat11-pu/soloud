@@ -84,12 +84,24 @@ namespace SoLoud
 			setVoiceVolume_internal(ch, aVolume);
 		}
 
-		// Fix initial voice volume ramp up		
+		// Keep the pan/volume interpolation state matched with the target
+		// channel volumes so the only start-up transient is the explicit
+		// fade-in envelope below.
 		int i;
 		for (i = 0; i < MAX_CHANNELS; i++)
 		{
 			mVoice[ch]->mCurrentChannelVolume[i] = mVoice[ch]->mChannelVolume[i] * mVoice[ch]->mOverallVolume;
 		}
+
+		// Millisecond-resolution fade-in. Starting the envelope at gain 0
+		// guarantees a re-triggered voice cannot inject a DC step/offset.
+		mVoice[ch]->mAttackSamplesDone = 0;
+		mVoice[ch]->mAttackSamplesTotal =
+			(unsigned int)((double)mVoiceFadeInMs * 0.001 * (double)mSamplerate);
+		mVoice[ch]->mReleaseSamplesDone = 0;
+		mVoice[ch]->mReleaseSamplesTotal = 0;
+		mVoice[ch]->mEnvelopeGain = 1.0f;
+		mVoice[ch]->mEnvelopeGainStart = 1.0f;
 
 		setVoiceRelativePlaySpeed_internal(ch, 1);
 		
@@ -155,6 +167,50 @@ namespace SoLoud
 		FOR_ALL_VOICES_PRE
 			stopVoice_internal(ch);
 		FOR_ALL_VOICES_POST
+	}
+
+	void Soloud::stop(handle aVoiceHandle, time aFadeoutTime)
+	{
+		unsigned int fadeSamples = 0;
+		if (aFadeoutTime > 0 && mSamplerate > 0)
+		{
+			double s = aFadeoutTime * (double)mSamplerate;
+			fadeSamples = (s > 0xffffffff) ? 0xffffffff : (unsigned int)s;
+		}
+
+		if (fadeSamples == 0)
+		{
+			stop(aVoiceHandle);
+			return;
+		}
+
+		FOR_ALL_VOICES_PRE
+			scheduleStopVoice_internal(ch, fadeSamples);
+		FOR_ALL_VOICES_POST
+	}
+
+	void Soloud::stopAll(time aFadeoutTime)
+	{
+		unsigned int fadeSamples = 0;
+		if (aFadeoutTime > 0 && mSamplerate > 0)
+		{
+			double s = aFadeoutTime * (double)mSamplerate;
+			fadeSamples = (s > 0xffffffff) ? 0xffffffff : (unsigned int)s;
+		}
+
+		lockAudioMutex_internal();
+		int i;
+		for (i = 0; i < (signed)mHighestVoice; i++)
+		{
+			if (mVoice[i])
+			{
+				if (fadeSamples == 0)
+					stopVoice_internal(i);
+				else
+					scheduleStopVoice_internal(i, fadeSamples);
+			}
+		}
+		unlockAudioMutex_internal();
 	}
 
 	void Soloud::stopAudioSource(AudioSource &aSound)

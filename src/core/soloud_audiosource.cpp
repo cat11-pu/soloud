@@ -94,6 +94,12 @@ namespace SoLoud
 		{
 			mCurrentChannelVolume[i] = 0;
 		}
+		mAttackSamplesDone = 0;
+		mAttackSamplesTotal = 0;
+		mReleaseSamplesDone = 0;
+		mReleaseSamplesTotal = 0;
+		mEnvelopeGain = 1.0f;
+		mEnvelopeGainStart = 1.0f;
 		// behind pointers because we swap between the two buffers
 		mResampleData[0] = 0;
 		mResampleData[1] = 0;
@@ -350,4 +356,3 @@ namespace SoLoud
 
 
 };
-

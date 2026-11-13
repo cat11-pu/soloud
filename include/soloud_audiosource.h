@@ -169,6 +169,20 @@ namespace SoLoud
 		int mActiveFader;
 		// Current channel volumes, used to ramp the volume changes to avoid clicks
 		float mCurrentChannelVolume[MAX_CHANNELS];
+		// Per-voice attack envelope state. Samples counted from voice start.
+		unsigned int mAttackSamplesDone;
+		// Length of the fade-in (attack) in samples; 0 disables fade-in.
+		unsigned int mAttackSamplesTotal;
+		// Per-voice stop (release) envelope state.
+		// 0 = not stopping, otherwise number of samples already faded out.
+		unsigned int mReleaseSamplesDone;
+		// Length of the fade-out (release) in samples.
+		unsigned int mReleaseSamplesTotal;
+		// Combined attack/release gain for the current mix block,
+		// updated by Soloud::updateVoiceEnvelope_internal().
+		float mEnvelopeGain;
+		// Start-of-block envelope gain, paired with mEnvelopeGain for per-sample ramps.
+		float mEnvelopeGainStart;
 		// ID of the sound source that generated this instance
 		unsigned int mAudioSourceID;
 		// Handle of the bus this audio instance is playing on. 0 for root.
