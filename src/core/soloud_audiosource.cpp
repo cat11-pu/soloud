@@ -26,6 +26,10 @@ freely, subject to the following restrictions:
 
 namespace SoLoud
 {
+	static bool validPlaybackTime(time aTime)
+	{
+		return aTime == aTime && aTime >= -1.0e300 && aTime <= 1.0e300;
+	}
 
 	AudioSourceInstance3dData::AudioSourceInstance3dData()
 	{
@@ -86,6 +90,9 @@ namespace SoLoud
 		mBusHandle = ~0u;
 		mLoopCount = 0;
 		mLoopPoint = 0;
+		mLoopEnd = 0;
+		mFadeIn = 0;
+		mFadeOut = 0;
 		for (i = 0; i < FILTERS_PER_STREAM; i++)
 		{
 			mFilter[i] = NULL;
@@ -122,6 +129,9 @@ namespace SoLoud
 		mStreamTime = 0.0f;
 		mStreamPosition = 0.0f;
 		mLoopPoint = aSource.mLoopPoint;
+		mLoopEnd = aSource.mLoopEnd;
+		mFadeIn = aSource.mFadeIn;
+		mFadeOut = aSource.mFadeOut;
 
 		if (aSource.mFlags & AudioSource::SHOULD_LOOP)
 		{
@@ -203,6 +213,9 @@ namespace SoLoud
 		mColliderData = 0;
 		mVolume = 1;
 		mLoopPoint = 0;
+		mLoopEnd = 0;
+		mFadeIn = 0;
+		mFadeOut = 0;
 	}
 
 	AudioSource::~AudioSource() 
@@ -217,12 +230,63 @@ namespace SoLoud
 
 	void AudioSource::setLoopPoint(time aLoopPoint)
 	{
-		mLoopPoint = aLoopPoint;
+		if (aLoopPoint >= 0 && validPlaybackTime(aLoopPoint))
+			mLoopPoint = aLoopPoint;
 	}
 
 	time AudioSource::getLoopPoint()
 	{
 		return mLoopPoint;
+	}
+
+	result AudioSource::setLoopRange(time aLoopStart, time aLoopEnd)
+	{
+		if (!validPlaybackTime(aLoopStart) || !validPlaybackTime(aLoopEnd) ||
+			aLoopStart < 0 || aLoopEnd < 0 || (aLoopEnd > 0 && aLoopEnd <= aLoopStart))
+			return INVALID_PARAMETER;
+		mLoopPoint = aLoopStart;
+		mLoopEnd = aLoopEnd;
+		return SO_NO_ERROR;
+	}
+
+	result AudioSource::setLoopEnd(time aLoopEnd)
+	{
+		if (!validPlaybackTime(aLoopEnd) || aLoopEnd < 0 ||
+			(aLoopEnd > 0 && aLoopEnd <= mLoopPoint))
+			return INVALID_PARAMETER;
+		mLoopEnd = aLoopEnd;
+		return SO_NO_ERROR;
+	}
+
+	time AudioSource::getLoopEnd()
+	{
+		return mLoopEnd;
+	}
+
+	void AudioSource::getLoopRange(time &aLoopStart, time &aLoopEnd)
+	{
+		aLoopStart = mLoopPoint;
+		aLoopEnd = mLoopEnd;
+	}
+
+	void AudioSource::setFadeIn(time aFadeIn)
+	{
+		mFadeIn = validPlaybackTime(aFadeIn) && aFadeIn > 0 ? aFadeIn : 0;
+	}
+
+	time AudioSource::getFadeIn()
+	{
+		return mFadeIn;
+	}
+
+	void AudioSource::setFadeOut(time aFadeOut)
+	{
+		mFadeOut = validPlaybackTime(aFadeOut) && aFadeOut > 0 ? aFadeOut : 0;
+	}
+
+	time AudioSource::getFadeOut()
+	{
+		return mFadeOut;
 	}
 
 	void AudioSource::setLooping(bool aLoop)
@@ -350,4 +414,3 @@ namespace SoLoud
 
 
 };
-

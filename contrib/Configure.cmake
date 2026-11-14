@@ -14,6 +14,9 @@ print_option_status (SOLOUD_C_API "Build C API")
 option (SOLOUD_BUILD_DEMOS "Set to ON for building demos" OFF)
 print_option_status (SOLOUD_BUILD_DEMOS "Build demos")
 
+option (SOLOUD_BUILD_TESTS "Set to ON for building tests" OFF)
+print_option_status (SOLOUD_BUILD_TESTS "Build tests")
+
 option (SOLOUD_BACKEND_NULL "Set to ON for building NULL backend" ON)
 print_option_status (SOLOUD_BACKEND_NULL "NULL backend")
 

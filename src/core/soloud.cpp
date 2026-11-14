@@ -1847,7 +1847,9 @@ namespace SoLoud
 									while (readcount < SAMPLE_GRANULARITY && voice->seek(voice->mLoopPoint, mScratch.mData, mScratchSize) == SO_NO_ERROR)
 									{
 										voice->mLoopCount++;
-										readcount += voice->getAudio(voice->mResampleData[0] + readcount, SAMPLE_GRANULARITY - readcount, SAMPLE_GRANULARITY);
+										int inc = voice->getAudio(voice->mResampleData[0] + readcount, SAMPLE_GRANULARITY - readcount, SAMPLE_GRANULARITY);
+										readcount += inc;
+										if (inc == 0) break;
 									}
 								}
 							}

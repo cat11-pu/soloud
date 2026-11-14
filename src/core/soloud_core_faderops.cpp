@@ -66,6 +66,22 @@ namespace SoLoud
 		FOR_ALL_VOICES_POST
 	}
 
+	void Soloud::fadeIn(handle aVoiceHandle, time aTime)
+	{
+		if (!(aTime > 0) || aTime > 1.0e300)
+			return;
+
+		FOR_ALL_VOICES_PRE
+			float to = mVoice[ch]->mSetVolume;
+			int i;
+			for (i = 0; i < MAX_CHANNELS; i++)
+			{
+				mVoice[ch]->mCurrentChannelVolume[i] = 0;
+			}
+			mVoice[ch]->mVolumeFader.set(0, to, aTime, mVoice[ch]->mStreamTime);
+		FOR_ALL_VOICES_POST
+	}
+
 	void Soloud::fadePan(handle aVoiceHandle, float aTo, time aTime)
 	{
 		float from = getPan(aVoiceHandle);

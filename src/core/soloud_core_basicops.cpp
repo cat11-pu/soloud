@@ -75,13 +75,23 @@ namespace SoLoud
 		}
 
 		setVoicePan_internal(ch, aPan);
+		float targetVolume;
 		if (aVolume < 0)
 		{
-			setVoiceVolume_internal(ch, aSound.mVolume);
+			targetVolume = aSound.mVolume;
 		}
 		else
 		{
-			setVoiceVolume_internal(ch, aVolume);
+			targetVolume = aVolume;
+		}
+		if (mVoice[ch]->mFadeIn > 0)
+		{
+			setVoiceVolume_internal(ch, 0);
+			mVoice[ch]->mVolumeFader.set(0, targetVolume, mVoice[ch]->mFadeIn, 0);
+		}
+		else
+		{
+			setVoiceVolume_internal(ch, targetVolume);
 		}
 
 		// Fix initial voice volume ramp up		
@@ -155,6 +165,31 @@ namespace SoLoud
 		FOR_ALL_VOICES_PRE
 			stopVoice_internal(ch);
 		FOR_ALL_VOICES_POST
+	}
+
+	void Soloud::stopWithFade(handle aVoiceHandle, time aFadeOut)
+	{
+		FOR_ALL_VOICES_PRE
+			time fade = aFadeOut < 0 ? mVoice[ch]->mFadeOut : aFadeOut;
+			if (!(fade == fade) || fade > 1.0e300)
+				fade = 0;
+			if (fade <= 0)
+			{
+				stopVoice_internal(ch);
+			}
+			else
+			{
+				mVoice[ch]->mVolumeFader.set(mVoice[ch]->mSetVolume, 0, fade, mVoice[ch]->mStreamTime);
+				// The mixer evaluates faders at the end of each block. Keep the
+				// voice alive for the block that completes the fade-out.
+				mVoice[ch]->mStopScheduler.set(1, 0, fade + 1.0e-9, mVoice[ch]->mStreamTime);
+			}
+		FOR_ALL_VOICES_POST
+	}
+
+	void Soloud::fadeOutAndStop(handle aVoiceHandle, time aFadeOut)
+	{
+		stopWithFade(aVoiceHandle, aFadeOut);
 	}
 
 	void Soloud::stopAudioSource(AudioSource &aSound)

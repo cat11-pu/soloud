@@ -272,6 +272,10 @@ namespace SoLoud
 		result seek(handle aVoiceHandle, time aSeconds);
 		// Stop the sound.
 		void stop(handle aVoiceHandle);
+		// Fade the sound out and stop it. Negative time uses the voice's configured fade-out time.
+		void stopWithFade(handle aVoiceHandle, time aFadeOut = -1.0);
+		// Alias for stopWithFade().
+		void fadeOutAndStop(handle aVoiceHandle, time aFadeOut = -1.0);
 		// Stop all voices.
 		void stopAll();
 		// Stop all voices that play this sound source
@@ -326,9 +330,17 @@ namespace SoLoud
 		bool getAutoStop(handle aVoiceHandle);
 		// Get voice loop point value
 		time getLoopPoint(handle aVoiceHandle);
+		// Get voice loop end value. Zero means end of stream.
+		time getLoopEnd(handle aVoiceHandle);
+		// Get voice loop range values.
+		void getLoopRange(handle aVoiceHandle, time &aLoopStart, time &aLoopEnd);
 
 		// Set voice loop point value
 		void setLoopPoint(handle aVoiceHandle, time aLoopPoint);
+		// Set voice loop range. End zero means end of stream.
+		result setLoopRange(handle aVoiceHandle, time aLoopStart, time aLoopEnd);
+		// Set voice loop end. Zero means end of stream.
+		result setLoopEnd(handle aVoiceHandle, time aLoopEnd);
 		// Set voice's loop state
 		void setLooping(handle aVoiceHandle, bool aLooping);
 		// Set whether sound should auto-stop when it ends
@@ -366,6 +378,8 @@ namespace SoLoud
 
 		// Set up volume fader
 		void fadeVolume(handle aVoiceHandle, float aTo, time aTime);
+		// Fade the voice in from silence to its current target volume
+		void fadeIn(handle aVoiceHandle, time aTime);
 		// Set up panning fader
 		void fadePan(handle aVoiceHandle, float aTo, time aTime);
 		// Set up relative play speed fader

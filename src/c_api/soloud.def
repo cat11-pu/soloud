@@ -3,6 +3,8 @@ EXPORTS
 	Soloud_create
 	Soloud_init
 	Soloud_initEx
+	Soloud_pause
+	Soloud_resume
 	Soloud_deinit
 	Soloud_getVersion
 	Soloud_getErrorString
@@ -25,6 +27,10 @@ EXPORTS
 	Soloud_playBackgroundEx
 	Soloud_seek
 	Soloud_stop
+	Soloud_stopWithFade
+	Soloud_stopWithFadeEx
+	Soloud_fadeOutAndStop
+	Soloud_fadeOutAndStopEx
 	Soloud_stopAll
 	Soloud_stopAudioSource
 	Soloud_countAudioSource
@@ -51,7 +57,11 @@ EXPORTS
 	Soloud_getLooping
 	Soloud_getAutoStop
 	Soloud_getLoopPoint
+	Soloud_getLoopEnd
+	Soloud_getLoopRange
 	Soloud_setLoopPoint
+	Soloud_setLoopRange
+	Soloud_setLoopEnd
 	Soloud_setLooping
 	Soloud_setAutoStop
 	Soloud_setMaxActiveVoiceCount
@@ -70,6 +80,7 @@ EXPORTS
 	Soloud_setVolume
 	Soloud_setDelaySamples
 	Soloud_fadeVolume
+	Soloud_fadeIn
 	Soloud_fadePan
 	Soloud_fadeRelativePlaySpeed
 	Soloud_fadeGlobalVolume
@@ -125,6 +136,14 @@ EXPORTS
 	Ay_setInaudibleBehavior
 	Ay_setLoopPoint
 	Ay_getLoopPoint
+	Ay_setLoopRange
+	Ay_setLoopEnd
+	Ay_getLoopEnd
+	Ay_getLoopRange
+	Ay_setFadeIn
+	Ay_getFadeIn
+	Ay_setFadeOut
+	Ay_getFadeOut
 	Ay_setFilter
 	Ay_stop
 	BassboostFilter_destroy
@@ -177,6 +196,14 @@ EXPORTS
 	Bus_setInaudibleBehavior
 	Bus_setLoopPoint
 	Bus_getLoopPoint
+	Bus_setLoopRange
+	Bus_setLoopEnd
+	Bus_getLoopEnd
+	Bus_getLoopRange
+	Bus_setFadeIn
+	Bus_getFadeIn
+	Bus_setFadeOut
+	Bus_getFadeOut
 	Bus_stop
 	DCRemovalFilter_destroy
 	DCRemovalFilter_create
@@ -249,6 +276,14 @@ EXPORTS
 	Monotone_setInaudibleBehavior
 	Monotone_setLoopPoint
 	Monotone_getLoopPoint
+	Monotone_setLoopRange
+	Monotone_setLoopEnd
+	Monotone_getLoopEnd
+	Monotone_getLoopRange
+	Monotone_setFadeIn
+	Monotone_getFadeIn
+	Monotone_setFadeOut
+	Monotone_getFadeOut
 	Monotone_setFilter
 	Monotone_stop
 	Noise_destroy
@@ -269,6 +304,14 @@ EXPORTS
 	Noise_setInaudibleBehavior
 	Noise_setLoopPoint
 	Noise_getLoopPoint
+	Noise_setLoopRange
+	Noise_setLoopEnd
+	Noise_getLoopEnd
+	Noise_getLoopRange
+	Noise_setFadeIn
+	Noise_getFadeIn
+	Noise_setFadeOut
+	Noise_getFadeOut
 	Noise_setFilter
 	Noise_stop
 	Openmpt_destroy
@@ -291,6 +334,14 @@ EXPORTS
 	Openmpt_setInaudibleBehavior
 	Openmpt_setLoopPoint
 	Openmpt_getLoopPoint
+	Openmpt_setLoopRange
+	Openmpt_setLoopEnd
+	Openmpt_getLoopEnd
+	Openmpt_getLoopRange
+	Openmpt_setFadeIn
+	Openmpt_getFadeIn
+	Openmpt_setFadeOut
+	Openmpt_getFadeOut
 	Openmpt_setFilter
 	Openmpt_stop
 	Queue_destroy
@@ -315,6 +366,14 @@ EXPORTS
 	Queue_setInaudibleBehavior
 	Queue_setLoopPoint
 	Queue_getLoopPoint
+	Queue_setLoopRange
+	Queue_setLoopEnd
+	Queue_getLoopEnd
+	Queue_getLoopRange
+	Queue_setFadeIn
+	Queue_getFadeIn
+	Queue_setFadeOut
+	Queue_getFadeOut
 	Queue_setFilter
 	Queue_stop
 	RobotizeFilter_destroy
@@ -347,6 +406,14 @@ EXPORTS
 	Sfxr_setInaudibleBehavior
 	Sfxr_setLoopPoint
 	Sfxr_getLoopPoint
+	Sfxr_setLoopRange
+	Sfxr_setLoopEnd
+	Sfxr_getLoopEnd
+	Sfxr_getLoopRange
+	Sfxr_setFadeIn
+	Sfxr_getFadeIn
+	Sfxr_setFadeOut
+	Sfxr_getFadeOut
 	Sfxr_setFilter
 	Sfxr_stop
 	Speech_destroy
@@ -368,6 +435,14 @@ EXPORTS
 	Speech_setInaudibleBehavior
 	Speech_setLoopPoint
 	Speech_getLoopPoint
+	Speech_setLoopRange
+	Speech_setLoopEnd
+	Speech_getLoopEnd
+	Speech_getLoopRange
+	Speech_setFadeIn
+	Speech_getFadeIn
+	Speech_setFadeOut
+	Speech_getFadeOut
 	Speech_setFilter
 	Speech_stop
 	TedSid_destroy
@@ -390,6 +465,14 @@ EXPORTS
 	TedSid_setInaudibleBehavior
 	TedSid_setLoopPoint
 	TedSid_getLoopPoint
+	TedSid_setLoopRange
+	TedSid_setLoopEnd
+	TedSid_getLoopEnd
+	TedSid_getLoopRange
+	TedSid_setFadeIn
+	TedSid_getFadeIn
+	TedSid_setFadeOut
+	TedSid_getFadeOut
 	TedSid_setFilter
 	TedSid_stop
 	Vic_destroy
@@ -412,6 +495,14 @@ EXPORTS
 	Vic_setInaudibleBehavior
 	Vic_setLoopPoint
 	Vic_getLoopPoint
+	Vic_setLoopRange
+	Vic_setLoopEnd
+	Vic_getLoopEnd
+	Vic_getLoopRange
+	Vic_setFadeIn
+	Vic_getFadeIn
+	Vic_setFadeOut
+	Vic_getFadeOut
 	Vic_setFilter
 	Vic_stop
 	Vizsn_destroy
@@ -431,6 +522,14 @@ EXPORTS
 	Vizsn_setInaudibleBehavior
 	Vizsn_setLoopPoint
 	Vizsn_getLoopPoint
+	Vizsn_setLoopRange
+	Vizsn_setLoopEnd
+	Vizsn_getLoopEnd
+	Vizsn_getLoopRange
+	Vizsn_setFadeIn
+	Vizsn_getFadeIn
+	Vizsn_setFadeOut
+	Vizsn_getFadeOut
 	Vizsn_setFilter
 	Vizsn_stop
 	Wav_destroy
@@ -460,6 +559,14 @@ EXPORTS
 	Wav_setInaudibleBehavior
 	Wav_setLoopPoint
 	Wav_getLoopPoint
+	Wav_setLoopRange
+	Wav_setLoopEnd
+	Wav_getLoopEnd
+	Wav_getLoopRange
+	Wav_setFadeIn
+	Wav_getFadeIn
+	Wav_setFadeOut
+	Wav_getFadeOut
 	Wav_setFilter
 	Wav_stop
 	WaveShaperFilter_destroy
@@ -493,5 +600,13 @@ EXPORTS
 	WavStream_setInaudibleBehavior
 	WavStream_setLoopPoint
 	WavStream_getLoopPoint
+	WavStream_setLoopRange
+	WavStream_setLoopEnd
+	WavStream_getLoopEnd
+	WavStream_getLoopRange
+	WavStream_setFadeIn
+	WavStream_getFadeIn
+	WavStream_setFadeOut
+	WavStream_getFadeOut
 	WavStream_setFilter
 	WavStream_stop

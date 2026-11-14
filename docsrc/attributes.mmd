@@ -173,6 +173,59 @@ queried with these functions.
 	
 \pagebreak
 
+### Soloud.setLoopRange(), Soloud.setLoopEnd(), Soloud.getLoopRange(), Soloud.getLoopEnd()
+
+Set or query the complete loop region of a live voice. The start is the
+same value as `setLoopPoint()`. The end is exclusive; zero means "end of
+stream". Looping must also be enabled with `setLooping()`.
+
+	soloud.setLooping(h, true);
+	soloud.setLoopRange(h, 1.0, 4.5); // play intro, then loop 1.0..4.5
+
+	double loopStart, loopEnd;
+	soloud.getLoopRange(h, loopStart, loopEnd);
+
+Wav and WavStream wrap at the exact source sample boundary. The intro
+before `loopStart` is played once, and sample `loopEnd` is not part of
+the loop. The mix buffer therefore contains no inserted silence or
+repeated boundary sample.
+
+Invalid negative or non-finite values are rejected with
+`INVALID_PARAMETER`. An end at or before the start is also invalid
+unless the end is zero. Ranges past the end of the stream are clamped.
+If clamping leaves an empty region, playback falls back to looping the
+complete stream.
+
+\pagebreak
+
+### Soloud.stopWithFade(), Soloud.fadeOutAndStop()
+
+Fade the voice to zero over the given number of seconds, then stop it.
+Calling it without a time, or with a negative time, uses the fade-out
+time configured on the audio source with `setFadeOut()`. A zero time is
+a hard stop. `fadeOutAndStop()` is an alias with the same behavior.
+
+	soloud.stopWithFade(h, 0.25);
+
+`stop()` remains a hard stop and removes the voice before the next mix.
+The next rendered block is silent. The actual time until a physical
+speaker is silent also includes the back-end buffer latency.
+
+\pagebreak
+
+### Soloud.fadeIn()
+
+Fade a live voice from silence to its current target volume.
+
+	handle h = soloud.play(coin);
+	soloud.fadeIn(h, 0.05);
+
+For automatic fade-in on every use of a sound source, set it on the
+source before playing:
+
+	coin.setFadeIn(0.05);
+	handle h = soloud.play(coin);
+
 
 ### Soloud.setInaudibleBehavior()
 

@@ -41,6 +41,31 @@ setVolume()
 
 \pagebreak
 
+### Soloud.fadeIn()
+
+Fade a live voice in from silence to its current target volume.
+
+	soloud.fadeIn(coin, 0.05);
+
+An audio source can also define this for every new instance:
+
+	coin.setFadeIn(0.05);
+
+### Soloud.stopWithFade()
+
+Fade a voice to zero and stop it. Without an explicit time, the source's
+configured `setFadeOut()` value is used.
+
+	soloud.stopWithFade(music, 0.5);
+	musicSource.setFadeOut(0.5);
+	soloud.stopWithFade(music); // same duration
+
+`Soloud.stop()` is a hard stop: the voice is removed before the next mix
+block, so the next rendered block is silent. Include any back-end buffer
+latency when measuring silence at the speaker.
+
+\pagebreak
+
 
 ### Soloud.fadePan()
 

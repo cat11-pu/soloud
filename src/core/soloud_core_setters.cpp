@@ -28,6 +28,10 @@ freely, subject to the following restrictions:
 
 namespace SoLoud
 {
+	static bool validPlaybackTime(time aTime)
+	{
+		return aTime == aTime && aTime >= -1.0e300 && aTime <= 1.0e300;
+	}
 	void Soloud::setPostClipScaler(float aScaler)
 	{
 		mPostClipScaler = aScaler;
@@ -180,9 +184,42 @@ namespace SoLoud
 
 	void Soloud::setLoopPoint(handle aVoiceHandle, time aLoopPoint)
 	{
+		if (aLoopPoint < 0 || !validPlaybackTime(aLoopPoint))
+			return;
 		FOR_ALL_VOICES_PRE
 			mVoice[ch]->mLoopPoint = aLoopPoint;
 		FOR_ALL_VOICES_POST
+	}
+
+	result Soloud::setLoopRange(handle aVoiceHandle, time aLoopStart, time aLoopEnd)
+	{
+		if (!validPlaybackTime(aLoopStart) || !validPlaybackTime(aLoopEnd) ||
+			aLoopStart < 0 || aLoopEnd < 0 || (aLoopEnd > 0 && aLoopEnd <= aLoopStart))
+			return INVALID_PARAMETER;
+		FOR_ALL_VOICES_PRE
+			mVoice[ch]->mLoopPoint = aLoopStart;
+			mVoice[ch]->mLoopEnd = aLoopEnd;
+		FOR_ALL_VOICES_POST
+		return SO_NO_ERROR;
+	}
+
+	result Soloud::setLoopEnd(handle aVoiceHandle, time aLoopEnd)
+	{
+		if (!validPlaybackTime(aLoopEnd) || aLoopEnd < 0)
+			return INVALID_PARAMETER;
+
+		result res = SO_NO_ERROR;
+		FOR_ALL_VOICES_PRE
+			if (aLoopEnd > 0 && aLoopEnd <= mVoice[ch]->mLoopPoint)
+			{
+				res = INVALID_PARAMETER;
+			}
+			else
+			{
+				mVoice[ch]->mLoopEnd = aLoopEnd;
+			}
+		FOR_ALL_VOICES_POST
+		return res;
 	}
 
 	void Soloud::setLooping(handle aVoiceHandle, bool aLooping)

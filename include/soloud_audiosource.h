@@ -187,6 +187,12 @@ namespace SoLoud
 		unsigned int mDelaySamples;
 		// When looping, start playing from this time
 		time mLoopPoint;
+		// When looping, wrap back to mLoopPoint at this time. Zero means end of stream.
+		time mLoopEnd;
+		// Fade in time for a newly started instance, in seconds. Zero disables fade in.
+		time mFadeIn;
+		// Default fade out time for stopWithFade(), in seconds. Zero disables fade out.
+		time mFadeOut;
 
 		// Get N samples from the stream to the buffer. Report samples written.
 		virtual unsigned int getAudio(float *aBuffer, unsigned int aSamplesToRead, unsigned int aBufferSize) = 0;
@@ -271,6 +277,12 @@ namespace SoLoud
 		int mColliderData;
 		// When looping, start playing from this time
 		time mLoopPoint;
+		// When looping, wrap back to mLoopPoint at this time. Zero means end of stream.
+		time mLoopEnd;
+		// Fade in time for instances created from this source, in seconds
+		time mFadeIn;
+		// Default fade out time for instances stopped with stopWithFade(), in seconds
+		time mFadeOut;
 
 		// CTor
 		AudioSource();
@@ -306,6 +318,22 @@ namespace SoLoud
 		void setLoopPoint(time aLoopPoint);
 		// Get current loop point value
 		time getLoopPoint();
+		// Set loop start and end times. End zero means end of stream. Returns INVALID_PARAMETER on bad range.
+		result setLoopRange(time aLoopStart, time aLoopEnd);
+		// Set loop end time. Zero means end of stream. Returns INVALID_PARAMETER if before loop start.
+		result setLoopEnd(time aLoopEnd);
+		// Get loop end time. Zero means end of stream.
+		time getLoopEnd();
+		// Get loop start and end times.
+		void getLoopRange(time &aLoopStart, time &aLoopEnd);
+		// Set fade in time for newly started instances
+		void setFadeIn(time aFadeIn);
+		// Get fade in time for newly started instances
+		time getFadeIn();
+		// Set default fade out time for stopWithFade()
+		void setFadeOut(time aFadeOut);
+		// Get default fade out time for stopWithFade()
+		time getFadeOut();
 
 		// Set filter. Set to NULL to clear the filter.
 		virtual void setFilter(unsigned int aFilterId, Filter *aFilter);

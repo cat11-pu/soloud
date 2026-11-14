@@ -27,6 +27,11 @@ endif ()
 
 include (src.cmake)
 
+IF (SOLOUD_BUILD_TESTS)
+	enable_testing ()
+	include (tests.cmake)
+ENDIF ()
+
 # Demos
 IF (SOLOUD_BUILD_DEMOS)
 	include (demos.cmake)

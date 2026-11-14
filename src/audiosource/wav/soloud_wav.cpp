@@ -42,23 +42,71 @@ namespace SoLoud
 	}
 
 	unsigned int WavInstance::getAudio(float *aBuffer, unsigned int aSamplesToRead, unsigned int aBufferSize)
-	{		
+	{
 		if (mParent->mData == NULL)
 			return 0;
 
-		unsigned int dataleft = mParent->mSampleCount - mOffset;
-		unsigned int copylen = dataleft;
-		if (copylen > aSamplesToRead)
-			copylen = aSamplesToRead;
-
-		unsigned int i;
-		for (i = 0; i < mChannels; i++)
+		unsigned int loopStart = 0;
+		unsigned int loopEnd = mParent->mSampleCount;
+		if (mFlags & AudioSourceInstance::LOOPING)
 		{
-			memcpy(aBuffer + i * aBufferSize, mParent->mData + mOffset + i * mParent->mSampleCount, sizeof(float) * copylen);
+			loopStart = (unsigned int)floor(mLoopPoint * mParent->mBaseSamplerate);
+			if (mLoopEnd > 0)
+				loopEnd = (unsigned int)floor(mLoopEnd * mParent->mBaseSamplerate);
+			if (loopEnd > mParent->mSampleCount)
+				loopEnd = mParent->mSampleCount;
+			if (loopStart >= loopEnd)
+			{
+				loopStart = 0;
+				loopEnd = mParent->mSampleCount;
+			}
+			if (mOffset >= loopEnd)
+				mOffset = loopStart;
 		}
 
-		mOffset += copylen;
-		return copylen;
+		unsigned int written = 0;
+		while (written < aSamplesToRead)
+		{
+			unsigned int end = (mFlags & AudioSourceInstance::LOOPING) ? loopEnd : mParent->mSampleCount;
+			if (mOffset >= end)
+			{
+				if (!(mFlags & AudioSourceInstance::LOOPING) || loopEnd <= loopStart)
+					break;
+				mOffset = loopStart;
+				mLoopCount++;
+			}
+
+			unsigned int copylen = end - mOffset;
+			if (copylen > aSamplesToRead - written)
+				copylen = aSamplesToRead - written;
+			if (copylen == 0)
+				break;
+
+			unsigned int i;
+			for (i = 0; i < mChannels; i++)
+			{
+				memcpy(aBuffer + i * aBufferSize + written,
+					mParent->mData + i * mParent->mSampleCount + mOffset,
+					sizeof(float) * copylen);
+			}
+			mOffset += copylen;
+			written += copylen;
+		}
+
+		return written;
+	}
+
+	result WavInstance::seek(time aSeconds, float * /*mScratch*/, unsigned int /*mScratchSize*/)
+	{
+		if (aSeconds < 0)
+			return INVALID_PARAMETER;
+
+		unsigned int target = (unsigned int)floor(aSeconds * mBaseSamplerate);
+		if (target > mParent->mSampleCount)
+			target = mParent->mSampleCount;
+		mOffset = target;
+		mStreamPosition = (double)target / mBaseSamplerate;
+		return SO_NO_ERROR;
 	}
 
 	result WavInstance::rewind()

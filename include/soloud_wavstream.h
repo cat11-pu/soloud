@@ -59,6 +59,9 @@ namespace SoLoud
 		unsigned int mOggFrameSize;
 		unsigned int mOggFrameOffset;
 		float **mOggOutputs;
+		unsigned int getAudioRaw(float *aBuffer, unsigned int aSamplesToRead, unsigned int aBufferSize);
+		result seekToFrame(unsigned int aFrame);
+		void getLoopRangeFrames(unsigned int &aLoopStart, unsigned int &aLoopEnd);
 	public:
 		WavStreamInstance(WavStream *aParent);
 		virtual unsigned int getAudio(float *aBuffer, unsigned int aSamplesToRead, unsigned int aBufferSize);

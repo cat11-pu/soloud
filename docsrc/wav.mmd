@@ -136,6 +136,31 @@ queried with these functions.
 	...
 	snd.setLoopPoint(0); // loop from start
 
+### Wav.setLoopRange(), Wav.setLoopEnd(), Wav.getLoopEnd(), Wav.getLoopRange()
+
+Configure a complete loop region for all instances created from this
+sound. The end is exclusive and zero means end of stream. For example:
+
+	snd.setLooping(true);
+	snd.setLoopRange(1.0, 4.5);
+	handle h = soloud.play(snd); // intro, then seamless 1.0..4.5 loop
+
+The loop wraps on the exact source sample, without inserting silence
+at the seam. Negative, non-finite, or empty ranges are rejected. Ranges
+past the end of the sound are clamped; an empty clamped range falls
+back to looping the whole sound.
+
+### Wav.setFadeIn(), Wav.setFadeOut(), Wav.getFadeIn(), Wav.getFadeOut()
+
+Set the default fade-in time for newly played instances, and the default
+fade-out time used by `Soloud.stopWithFade(h)`.
+
+	snd.setFadeIn(0.05);
+	snd.setFadeOut(0.20);
+	handle h = soloud.play(snd);
+	...
+	soloud.stopWithFade(h);
+
 ### Inherited 3d audio interfaces
 
 Like all other audio sources, Wav inherits the 3d audio interfaces. Please refer to the 3d audio chapter for details on:
@@ -148,4 +173,3 @@ Like all other audio sources, Wav inherits the 3d audio interfaces. Please refer
 - Wav.set3dDistanceDelay()
 - Wav.set3dCollider()
 - Wav.set3dAttenuator()
-          

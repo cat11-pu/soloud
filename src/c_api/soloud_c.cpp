@@ -85,6 +85,18 @@ int Soloud_initEx(void * aClassPtr, unsigned int aFlags, unsigned int aBackend, 
 	return cl->init(aFlags, aBackend, aSamplerate, aBufferSize, aChannels);
 }
 
+int Soloud_pause(void * aClassPtr)
+{
+	Soloud * cl = (Soloud *)aClassPtr;
+	return cl->pause();
+}
+
+int Soloud_resume(void * aClassPtr)
+{
+	Soloud * cl = (Soloud *)aClassPtr;
+	return cl->resume();
+}
+
 void Soloud_deinit(void * aClassPtr)
 {
 	Soloud * cl = (Soloud *)aClassPtr;
@@ -215,6 +227,30 @@ void Soloud_stop(void * aClassPtr, unsigned int aVoiceHandle)
 {
 	Soloud * cl = (Soloud *)aClassPtr;
 	cl->stop(aVoiceHandle);
+}
+
+void Soloud_stopWithFade(void * aClassPtr, unsigned int aVoiceHandle)
+{
+	Soloud * cl = (Soloud *)aClassPtr;
+	cl->stopWithFade(aVoiceHandle);
+}
+
+void Soloud_stopWithFadeEx(void * aClassPtr, unsigned int aVoiceHandle, double aFadeOut)
+{
+	Soloud * cl = (Soloud *)aClassPtr;
+	cl->stopWithFade(aVoiceHandle, aFadeOut);
+}
+
+void Soloud_fadeOutAndStop(void * aClassPtr, unsigned int aVoiceHandle)
+{
+	Soloud * cl = (Soloud *)aClassPtr;
+	cl->fadeOutAndStop(aVoiceHandle);
+}
+
+void Soloud_fadeOutAndStopEx(void * aClassPtr, unsigned int aVoiceHandle, double aFadeOut)
+{
+	Soloud * cl = (Soloud *)aClassPtr;
+	cl->fadeOutAndStop(aVoiceHandle, aFadeOut);
 }
 
 void Soloud_stopAll(void * aClassPtr)
@@ -373,10 +409,34 @@ double Soloud_getLoopPoint(void * aClassPtr, unsigned int aVoiceHandle)
 	return cl->getLoopPoint(aVoiceHandle);
 }
 
+double Soloud_getLoopEnd(void * aClassPtr, unsigned int aVoiceHandle)
+{
+	Soloud * cl = (Soloud *)aClassPtr;
+	return cl->getLoopEnd(aVoiceHandle);
+}
+
+void Soloud_getLoopRange(void * aClassPtr, unsigned int aVoiceHandle, double * aLoopStart, double * aLoopEnd)
+{
+	Soloud * cl = (Soloud *)aClassPtr;
+	cl->getLoopRange(aVoiceHandle, *aLoopStart, *aLoopEnd);
+}
+
 void Soloud_setLoopPoint(void * aClassPtr, unsigned int aVoiceHandle, double aLoopPoint)
 {
 	Soloud * cl = (Soloud *)aClassPtr;
 	cl->setLoopPoint(aVoiceHandle, aLoopPoint);
+}
+
+int Soloud_setLoopRange(void * aClassPtr, unsigned int aVoiceHandle, double aLoopStart, double aLoopEnd)
+{
+	Soloud * cl = (Soloud *)aClassPtr;
+	return cl->setLoopRange(aVoiceHandle, aLoopStart, aLoopEnd);
+}
+
+int Soloud_setLoopEnd(void * aClassPtr, unsigned int aVoiceHandle, double aLoopEnd)
+{
+	Soloud * cl = (Soloud *)aClassPtr;
+	return cl->setLoopEnd(aVoiceHandle, aLoopEnd);
 }
 
 void Soloud_setLooping(void * aClassPtr, unsigned int aVoiceHandle, int aLooping)
@@ -485,6 +545,12 @@ void Soloud_fadeVolume(void * aClassPtr, unsigned int aVoiceHandle, float aTo, d
 {
 	Soloud * cl = (Soloud *)aClassPtr;
 	cl->fadeVolume(aVoiceHandle, aTo, aTime);
+}
+
+void Soloud_fadeIn(void * aClassPtr, unsigned int aVoiceHandle, double aTime)
+{
+	Soloud * cl = (Soloud *)aClassPtr;
+	cl->fadeIn(aVoiceHandle, aTime);
 }
 
 void Soloud_fadePan(void * aClassPtr, unsigned int aVoiceHandle, float aTo, double aTime)
@@ -815,6 +881,54 @@ double Ay_getLoopPoint(void * aClassPtr)
 	return cl->getLoopPoint();
 }
 
+int Ay_setLoopRange(void * aClassPtr, double aLoopStart, double aLoopEnd)
+{
+	Ay * cl = (Ay *)aClassPtr;
+	return cl->setLoopRange(aLoopStart, aLoopEnd);
+}
+
+int Ay_setLoopEnd(void * aClassPtr, double aLoopEnd)
+{
+	Ay * cl = (Ay *)aClassPtr;
+	return cl->setLoopEnd(aLoopEnd);
+}
+
+double Ay_getLoopEnd(void * aClassPtr)
+{
+	Ay * cl = (Ay *)aClassPtr;
+	return cl->getLoopEnd();
+}
+
+void Ay_getLoopRange(void * aClassPtr, double * aLoopStart, double * aLoopEnd)
+{
+	Ay * cl = (Ay *)aClassPtr;
+	cl->getLoopRange(*aLoopStart, *aLoopEnd);
+}
+
+void Ay_setFadeIn(void * aClassPtr, double aFadeIn)
+{
+	Ay * cl = (Ay *)aClassPtr;
+	cl->setFadeIn(aFadeIn);
+}
+
+double Ay_getFadeIn(void * aClassPtr)
+{
+	Ay * cl = (Ay *)aClassPtr;
+	return cl->getFadeIn();
+}
+
+void Ay_setFadeOut(void * aClassPtr, double aFadeOut)
+{
+	Ay * cl = (Ay *)aClassPtr;
+	cl->setFadeOut(aFadeOut);
+}
+
+double Ay_getFadeOut(void * aClassPtr)
+{
+	Ay * cl = (Ay *)aClassPtr;
+	return cl->getFadeOut();
+}
+
 void Ay_setFilter(void * aClassPtr, unsigned int aFilterId, Filter * aFilter)
 {
 	Ay * cl = (Ay *)aClassPtr;
@@ -1119,6 +1233,54 @@ double Bus_getLoopPoint(void * aClassPtr)
 {
 	Bus * cl = (Bus *)aClassPtr;
 	return cl->getLoopPoint();
+}
+
+int Bus_setLoopRange(void * aClassPtr, double aLoopStart, double aLoopEnd)
+{
+	Bus * cl = (Bus *)aClassPtr;
+	return cl->setLoopRange(aLoopStart, aLoopEnd);
+}
+
+int Bus_setLoopEnd(void * aClassPtr, double aLoopEnd)
+{
+	Bus * cl = (Bus *)aClassPtr;
+	return cl->setLoopEnd(aLoopEnd);
+}
+
+double Bus_getLoopEnd(void * aClassPtr)
+{
+	Bus * cl = (Bus *)aClassPtr;
+	return cl->getLoopEnd();
+}
+
+void Bus_getLoopRange(void * aClassPtr, double * aLoopStart, double * aLoopEnd)
+{
+	Bus * cl = (Bus *)aClassPtr;
+	cl->getLoopRange(*aLoopStart, *aLoopEnd);
+}
+
+void Bus_setFadeIn(void * aClassPtr, double aFadeIn)
+{
+	Bus * cl = (Bus *)aClassPtr;
+	cl->setFadeIn(aFadeIn);
+}
+
+double Bus_getFadeIn(void * aClassPtr)
+{
+	Bus * cl = (Bus *)aClassPtr;
+	return cl->getFadeIn();
+}
+
+void Bus_setFadeOut(void * aClassPtr, double aFadeOut)
+{
+	Bus * cl = (Bus *)aClassPtr;
+	cl->setFadeOut(aFadeOut);
+}
+
+double Bus_getFadeOut(void * aClassPtr)
+{
+	Bus * cl = (Bus *)aClassPtr;
+	return cl->getFadeOut();
 }
 
 void Bus_stop(void * aClassPtr)
@@ -1539,6 +1701,54 @@ double Monotone_getLoopPoint(void * aClassPtr)
 	return cl->getLoopPoint();
 }
 
+int Monotone_setLoopRange(void * aClassPtr, double aLoopStart, double aLoopEnd)
+{
+	Monotone * cl = (Monotone *)aClassPtr;
+	return cl->setLoopRange(aLoopStart, aLoopEnd);
+}
+
+int Monotone_setLoopEnd(void * aClassPtr, double aLoopEnd)
+{
+	Monotone * cl = (Monotone *)aClassPtr;
+	return cl->setLoopEnd(aLoopEnd);
+}
+
+double Monotone_getLoopEnd(void * aClassPtr)
+{
+	Monotone * cl = (Monotone *)aClassPtr;
+	return cl->getLoopEnd();
+}
+
+void Monotone_getLoopRange(void * aClassPtr, double * aLoopStart, double * aLoopEnd)
+{
+	Monotone * cl = (Monotone *)aClassPtr;
+	cl->getLoopRange(*aLoopStart, *aLoopEnd);
+}
+
+void Monotone_setFadeIn(void * aClassPtr, double aFadeIn)
+{
+	Monotone * cl = (Monotone *)aClassPtr;
+	cl->setFadeIn(aFadeIn);
+}
+
+double Monotone_getFadeIn(void * aClassPtr)
+{
+	Monotone * cl = (Monotone *)aClassPtr;
+	return cl->getFadeIn();
+}
+
+void Monotone_setFadeOut(void * aClassPtr, double aFadeOut)
+{
+	Monotone * cl = (Monotone *)aClassPtr;
+	cl->setFadeOut(aFadeOut);
+}
+
+double Monotone_getFadeOut(void * aClassPtr)
+{
+	Monotone * cl = (Monotone *)aClassPtr;
+	return cl->getFadeOut();
+}
+
 void Monotone_setFilter(void * aClassPtr, unsigned int aFilterId, Filter * aFilter)
 {
 	Monotone * cl = (Monotone *)aClassPtr;
@@ -1655,6 +1865,54 @@ double Noise_getLoopPoint(void * aClassPtr)
 {
 	Noise * cl = (Noise *)aClassPtr;
 	return cl->getLoopPoint();
+}
+
+int Noise_setLoopRange(void * aClassPtr, double aLoopStart, double aLoopEnd)
+{
+	Noise * cl = (Noise *)aClassPtr;
+	return cl->setLoopRange(aLoopStart, aLoopEnd);
+}
+
+int Noise_setLoopEnd(void * aClassPtr, double aLoopEnd)
+{
+	Noise * cl = (Noise *)aClassPtr;
+	return cl->setLoopEnd(aLoopEnd);
+}
+
+double Noise_getLoopEnd(void * aClassPtr)
+{
+	Noise * cl = (Noise *)aClassPtr;
+	return cl->getLoopEnd();
+}
+
+void Noise_getLoopRange(void * aClassPtr, double * aLoopStart, double * aLoopEnd)
+{
+	Noise * cl = (Noise *)aClassPtr;
+	cl->getLoopRange(*aLoopStart, *aLoopEnd);
+}
+
+void Noise_setFadeIn(void * aClassPtr, double aFadeIn)
+{
+	Noise * cl = (Noise *)aClassPtr;
+	cl->setFadeIn(aFadeIn);
+}
+
+double Noise_getFadeIn(void * aClassPtr)
+{
+	Noise * cl = (Noise *)aClassPtr;
+	return cl->getFadeIn();
+}
+
+void Noise_setFadeOut(void * aClassPtr, double aFadeOut)
+{
+	Noise * cl = (Noise *)aClassPtr;
+	cl->setFadeOut(aFadeOut);
+}
+
+double Noise_getFadeOut(void * aClassPtr)
+{
+	Noise * cl = (Noise *)aClassPtr;
+	return cl->getFadeOut();
 }
 
 void Noise_setFilter(void * aClassPtr, unsigned int aFilterId, Filter * aFilter)
@@ -1785,6 +2043,54 @@ double Openmpt_getLoopPoint(void * aClassPtr)
 {
 	Openmpt * cl = (Openmpt *)aClassPtr;
 	return cl->getLoopPoint();
+}
+
+int Openmpt_setLoopRange(void * aClassPtr, double aLoopStart, double aLoopEnd)
+{
+	Openmpt * cl = (Openmpt *)aClassPtr;
+	return cl->setLoopRange(aLoopStart, aLoopEnd);
+}
+
+int Openmpt_setLoopEnd(void * aClassPtr, double aLoopEnd)
+{
+	Openmpt * cl = (Openmpt *)aClassPtr;
+	return cl->setLoopEnd(aLoopEnd);
+}
+
+double Openmpt_getLoopEnd(void * aClassPtr)
+{
+	Openmpt * cl = (Openmpt *)aClassPtr;
+	return cl->getLoopEnd();
+}
+
+void Openmpt_getLoopRange(void * aClassPtr, double * aLoopStart, double * aLoopEnd)
+{
+	Openmpt * cl = (Openmpt *)aClassPtr;
+	cl->getLoopRange(*aLoopStart, *aLoopEnd);
+}
+
+void Openmpt_setFadeIn(void * aClassPtr, double aFadeIn)
+{
+	Openmpt * cl = (Openmpt *)aClassPtr;
+	cl->setFadeIn(aFadeIn);
+}
+
+double Openmpt_getFadeIn(void * aClassPtr)
+{
+	Openmpt * cl = (Openmpt *)aClassPtr;
+	return cl->getFadeIn();
+}
+
+void Openmpt_setFadeOut(void * aClassPtr, double aFadeOut)
+{
+	Openmpt * cl = (Openmpt *)aClassPtr;
+	cl->setFadeOut(aFadeOut);
+}
+
+double Openmpt_getFadeOut(void * aClassPtr)
+{
+	Openmpt * cl = (Openmpt *)aClassPtr;
+	return cl->getFadeOut();
 }
 
 void Openmpt_setFilter(void * aClassPtr, unsigned int aFilterId, Filter * aFilter)
@@ -1927,6 +2233,54 @@ double Queue_getLoopPoint(void * aClassPtr)
 {
 	Queue * cl = (Queue *)aClassPtr;
 	return cl->getLoopPoint();
+}
+
+int Queue_setLoopRange(void * aClassPtr, double aLoopStart, double aLoopEnd)
+{
+	Queue * cl = (Queue *)aClassPtr;
+	return cl->setLoopRange(aLoopStart, aLoopEnd);
+}
+
+int Queue_setLoopEnd(void * aClassPtr, double aLoopEnd)
+{
+	Queue * cl = (Queue *)aClassPtr;
+	return cl->setLoopEnd(aLoopEnd);
+}
+
+double Queue_getLoopEnd(void * aClassPtr)
+{
+	Queue * cl = (Queue *)aClassPtr;
+	return cl->getLoopEnd();
+}
+
+void Queue_getLoopRange(void * aClassPtr, double * aLoopStart, double * aLoopEnd)
+{
+	Queue * cl = (Queue *)aClassPtr;
+	cl->getLoopRange(*aLoopStart, *aLoopEnd);
+}
+
+void Queue_setFadeIn(void * aClassPtr, double aFadeIn)
+{
+	Queue * cl = (Queue *)aClassPtr;
+	cl->setFadeIn(aFadeIn);
+}
+
+double Queue_getFadeIn(void * aClassPtr)
+{
+	Queue * cl = (Queue *)aClassPtr;
+	return cl->getFadeIn();
+}
+
+void Queue_setFadeOut(void * aClassPtr, double aFadeOut)
+{
+	Queue * cl = (Queue *)aClassPtr;
+	cl->setFadeOut(aFadeOut);
+}
+
+double Queue_getFadeOut(void * aClassPtr)
+{
+	Queue * cl = (Queue *)aClassPtr;
+	return cl->getFadeOut();
 }
 
 void Queue_setFilter(void * aClassPtr, unsigned int aFilterId, Filter * aFilter)
@@ -2117,6 +2471,54 @@ double Sfxr_getLoopPoint(void * aClassPtr)
 	return cl->getLoopPoint();
 }
 
+int Sfxr_setLoopRange(void * aClassPtr, double aLoopStart, double aLoopEnd)
+{
+	Sfxr * cl = (Sfxr *)aClassPtr;
+	return cl->setLoopRange(aLoopStart, aLoopEnd);
+}
+
+int Sfxr_setLoopEnd(void * aClassPtr, double aLoopEnd)
+{
+	Sfxr * cl = (Sfxr *)aClassPtr;
+	return cl->setLoopEnd(aLoopEnd);
+}
+
+double Sfxr_getLoopEnd(void * aClassPtr)
+{
+	Sfxr * cl = (Sfxr *)aClassPtr;
+	return cl->getLoopEnd();
+}
+
+void Sfxr_getLoopRange(void * aClassPtr, double * aLoopStart, double * aLoopEnd)
+{
+	Sfxr * cl = (Sfxr *)aClassPtr;
+	cl->getLoopRange(*aLoopStart, *aLoopEnd);
+}
+
+void Sfxr_setFadeIn(void * aClassPtr, double aFadeIn)
+{
+	Sfxr * cl = (Sfxr *)aClassPtr;
+	cl->setFadeIn(aFadeIn);
+}
+
+double Sfxr_getFadeIn(void * aClassPtr)
+{
+	Sfxr * cl = (Sfxr *)aClassPtr;
+	return cl->getFadeIn();
+}
+
+void Sfxr_setFadeOut(void * aClassPtr, double aFadeOut)
+{
+	Sfxr * cl = (Sfxr *)aClassPtr;
+	cl->setFadeOut(aFadeOut);
+}
+
+double Sfxr_getFadeOut(void * aClassPtr)
+{
+	Sfxr * cl = (Sfxr *)aClassPtr;
+	return cl->getFadeOut();
+}
+
 void Sfxr_setFilter(void * aClassPtr, unsigned int aFilterId, Filter * aFilter)
 {
 	Sfxr * cl = (Sfxr *)aClassPtr;
@@ -2239,6 +2641,54 @@ double Speech_getLoopPoint(void * aClassPtr)
 {
 	Speech * cl = (Speech *)aClassPtr;
 	return cl->getLoopPoint();
+}
+
+int Speech_setLoopRange(void * aClassPtr, double aLoopStart, double aLoopEnd)
+{
+	Speech * cl = (Speech *)aClassPtr;
+	return cl->setLoopRange(aLoopStart, aLoopEnd);
+}
+
+int Speech_setLoopEnd(void * aClassPtr, double aLoopEnd)
+{
+	Speech * cl = (Speech *)aClassPtr;
+	return cl->setLoopEnd(aLoopEnd);
+}
+
+double Speech_getLoopEnd(void * aClassPtr)
+{
+	Speech * cl = (Speech *)aClassPtr;
+	return cl->getLoopEnd();
+}
+
+void Speech_getLoopRange(void * aClassPtr, double * aLoopStart, double * aLoopEnd)
+{
+	Speech * cl = (Speech *)aClassPtr;
+	cl->getLoopRange(*aLoopStart, *aLoopEnd);
+}
+
+void Speech_setFadeIn(void * aClassPtr, double aFadeIn)
+{
+	Speech * cl = (Speech *)aClassPtr;
+	cl->setFadeIn(aFadeIn);
+}
+
+double Speech_getFadeIn(void * aClassPtr)
+{
+	Speech * cl = (Speech *)aClassPtr;
+	return cl->getFadeIn();
+}
+
+void Speech_setFadeOut(void * aClassPtr, double aFadeOut)
+{
+	Speech * cl = (Speech *)aClassPtr;
+	cl->setFadeOut(aFadeOut);
+}
+
+double Speech_getFadeOut(void * aClassPtr)
+{
+	Speech * cl = (Speech *)aClassPtr;
+	return cl->getFadeOut();
 }
 
 void Speech_setFilter(void * aClassPtr, unsigned int aFilterId, Filter * aFilter)
@@ -2371,6 +2821,54 @@ double TedSid_getLoopPoint(void * aClassPtr)
 	return cl->getLoopPoint();
 }
 
+int TedSid_setLoopRange(void * aClassPtr, double aLoopStart, double aLoopEnd)
+{
+	TedSid * cl = (TedSid *)aClassPtr;
+	return cl->setLoopRange(aLoopStart, aLoopEnd);
+}
+
+int TedSid_setLoopEnd(void * aClassPtr, double aLoopEnd)
+{
+	TedSid * cl = (TedSid *)aClassPtr;
+	return cl->setLoopEnd(aLoopEnd);
+}
+
+double TedSid_getLoopEnd(void * aClassPtr)
+{
+	TedSid * cl = (TedSid *)aClassPtr;
+	return cl->getLoopEnd();
+}
+
+void TedSid_getLoopRange(void * aClassPtr, double * aLoopStart, double * aLoopEnd)
+{
+	TedSid * cl = (TedSid *)aClassPtr;
+	cl->getLoopRange(*aLoopStart, *aLoopEnd);
+}
+
+void TedSid_setFadeIn(void * aClassPtr, double aFadeIn)
+{
+	TedSid * cl = (TedSid *)aClassPtr;
+	cl->setFadeIn(aFadeIn);
+}
+
+double TedSid_getFadeIn(void * aClassPtr)
+{
+	TedSid * cl = (TedSid *)aClassPtr;
+	return cl->getFadeIn();
+}
+
+void TedSid_setFadeOut(void * aClassPtr, double aFadeOut)
+{
+	TedSid * cl = (TedSid *)aClassPtr;
+	cl->setFadeOut(aFadeOut);
+}
+
+double TedSid_getFadeOut(void * aClassPtr)
+{
+	TedSid * cl = (TedSid *)aClassPtr;
+	return cl->getFadeOut();
+}
+
 void TedSid_setFilter(void * aClassPtr, unsigned int aFilterId, Filter * aFilter)
 {
 	TedSid * cl = (TedSid *)aClassPtr;
@@ -2501,6 +2999,54 @@ double Vic_getLoopPoint(void * aClassPtr)
 	return cl->getLoopPoint();
 }
 
+int Vic_setLoopRange(void * aClassPtr, double aLoopStart, double aLoopEnd)
+{
+	Vic * cl = (Vic *)aClassPtr;
+	return cl->setLoopRange(aLoopStart, aLoopEnd);
+}
+
+int Vic_setLoopEnd(void * aClassPtr, double aLoopEnd)
+{
+	Vic * cl = (Vic *)aClassPtr;
+	return cl->setLoopEnd(aLoopEnd);
+}
+
+double Vic_getLoopEnd(void * aClassPtr)
+{
+	Vic * cl = (Vic *)aClassPtr;
+	return cl->getLoopEnd();
+}
+
+void Vic_getLoopRange(void * aClassPtr, double * aLoopStart, double * aLoopEnd)
+{
+	Vic * cl = (Vic *)aClassPtr;
+	cl->getLoopRange(*aLoopStart, *aLoopEnd);
+}
+
+void Vic_setFadeIn(void * aClassPtr, double aFadeIn)
+{
+	Vic * cl = (Vic *)aClassPtr;
+	cl->setFadeIn(aFadeIn);
+}
+
+double Vic_getFadeIn(void * aClassPtr)
+{
+	Vic * cl = (Vic *)aClassPtr;
+	return cl->getFadeIn();
+}
+
+void Vic_setFadeOut(void * aClassPtr, double aFadeOut)
+{
+	Vic * cl = (Vic *)aClassPtr;
+	cl->setFadeOut(aFadeOut);
+}
+
+double Vic_getFadeOut(void * aClassPtr)
+{
+	Vic * cl = (Vic *)aClassPtr;
+	return cl->getFadeOut();
+}
+
 void Vic_setFilter(void * aClassPtr, unsigned int aFilterId, Filter * aFilter)
 {
 	Vic * cl = (Vic *)aClassPtr;
@@ -2611,6 +3157,54 @@ double Vizsn_getLoopPoint(void * aClassPtr)
 {
 	Vizsn * cl = (Vizsn *)aClassPtr;
 	return cl->getLoopPoint();
+}
+
+int Vizsn_setLoopRange(void * aClassPtr, double aLoopStart, double aLoopEnd)
+{
+	Vizsn * cl = (Vizsn *)aClassPtr;
+	return cl->setLoopRange(aLoopStart, aLoopEnd);
+}
+
+int Vizsn_setLoopEnd(void * aClassPtr, double aLoopEnd)
+{
+	Vizsn * cl = (Vizsn *)aClassPtr;
+	return cl->setLoopEnd(aLoopEnd);
+}
+
+double Vizsn_getLoopEnd(void * aClassPtr)
+{
+	Vizsn * cl = (Vizsn *)aClassPtr;
+	return cl->getLoopEnd();
+}
+
+void Vizsn_getLoopRange(void * aClassPtr, double * aLoopStart, double * aLoopEnd)
+{
+	Vizsn * cl = (Vizsn *)aClassPtr;
+	cl->getLoopRange(*aLoopStart, *aLoopEnd);
+}
+
+void Vizsn_setFadeIn(void * aClassPtr, double aFadeIn)
+{
+	Vizsn * cl = (Vizsn *)aClassPtr;
+	cl->setFadeIn(aFadeIn);
+}
+
+double Vizsn_getFadeIn(void * aClassPtr)
+{
+	Vizsn * cl = (Vizsn *)aClassPtr;
+	return cl->getFadeIn();
+}
+
+void Vizsn_setFadeOut(void * aClassPtr, double aFadeOut)
+{
+	Vizsn * cl = (Vizsn *)aClassPtr;
+	cl->setFadeOut(aFadeOut);
+}
+
+double Vizsn_getFadeOut(void * aClassPtr)
+{
+	Vizsn * cl = (Vizsn *)aClassPtr;
+	return cl->getFadeOut();
 }
 
 void Vizsn_setFilter(void * aClassPtr, unsigned int aFilterId, Filter * aFilter)
@@ -2783,6 +3377,54 @@ double Wav_getLoopPoint(void * aClassPtr)
 {
 	Wav * cl = (Wav *)aClassPtr;
 	return cl->getLoopPoint();
+}
+
+int Wav_setLoopRange(void * aClassPtr, double aLoopStart, double aLoopEnd)
+{
+	Wav * cl = (Wav *)aClassPtr;
+	return cl->setLoopRange(aLoopStart, aLoopEnd);
+}
+
+int Wav_setLoopEnd(void * aClassPtr, double aLoopEnd)
+{
+	Wav * cl = (Wav *)aClassPtr;
+	return cl->setLoopEnd(aLoopEnd);
+}
+
+double Wav_getLoopEnd(void * aClassPtr)
+{
+	Wav * cl = (Wav *)aClassPtr;
+	return cl->getLoopEnd();
+}
+
+void Wav_getLoopRange(void * aClassPtr, double * aLoopStart, double * aLoopEnd)
+{
+	Wav * cl = (Wav *)aClassPtr;
+	cl->getLoopRange(*aLoopStart, *aLoopEnd);
+}
+
+void Wav_setFadeIn(void * aClassPtr, double aFadeIn)
+{
+	Wav * cl = (Wav *)aClassPtr;
+	cl->setFadeIn(aFadeIn);
+}
+
+double Wav_getFadeIn(void * aClassPtr)
+{
+	Wav * cl = (Wav *)aClassPtr;
+	return cl->getFadeIn();
+}
+
+void Wav_setFadeOut(void * aClassPtr, double aFadeOut)
+{
+	Wav * cl = (Wav *)aClassPtr;
+	cl->setFadeOut(aFadeOut);
+}
+
+double Wav_getFadeOut(void * aClassPtr)
+{
+	Wav * cl = (Wav *)aClassPtr;
+	return cl->getFadeOut();
 }
 
 void Wav_setFilter(void * aClassPtr, unsigned int aFilterId, Filter * aFilter)
@@ -2977,6 +3619,54 @@ double WavStream_getLoopPoint(void * aClassPtr)
 {
 	WavStream * cl = (WavStream *)aClassPtr;
 	return cl->getLoopPoint();
+}
+
+int WavStream_setLoopRange(void * aClassPtr, double aLoopStart, double aLoopEnd)
+{
+	WavStream * cl = (WavStream *)aClassPtr;
+	return cl->setLoopRange(aLoopStart, aLoopEnd);
+}
+
+int WavStream_setLoopEnd(void * aClassPtr, double aLoopEnd)
+{
+	WavStream * cl = (WavStream *)aClassPtr;
+	return cl->setLoopEnd(aLoopEnd);
+}
+
+double WavStream_getLoopEnd(void * aClassPtr)
+{
+	WavStream * cl = (WavStream *)aClassPtr;
+	return cl->getLoopEnd();
+}
+
+void WavStream_getLoopRange(void * aClassPtr, double * aLoopStart, double * aLoopEnd)
+{
+	WavStream * cl = (WavStream *)aClassPtr;
+	cl->getLoopRange(*aLoopStart, *aLoopEnd);
+}
+
+void WavStream_setFadeIn(void * aClassPtr, double aFadeIn)
+{
+	WavStream * cl = (WavStream *)aClassPtr;
+	cl->setFadeIn(aFadeIn);
+}
+
+double WavStream_getFadeIn(void * aClassPtr)
+{
+	WavStream * cl = (WavStream *)aClassPtr;
+	return cl->getFadeIn();
+}
+
+void WavStream_setFadeOut(void * aClassPtr, double aFadeOut)
+{
+	WavStream * cl = (WavStream *)aClassPtr;
+	cl->setFadeOut(aFadeOut);
+}
+
+double WavStream_getFadeOut(void * aClassPtr)
+{
+	WavStream * cl = (WavStream *)aClassPtr;
+	return cl->getFadeOut();
 }
 
 void WavStream_setFilter(void * aClassPtr, unsigned int aFilterId, Filter * aFilter)

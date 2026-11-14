@@ -237,7 +237,7 @@ namespace SoLoud
 
 	
 
-	unsigned int WavStreamInstance::getAudio(float *aBuffer, unsigned int aSamplesToRead, unsigned int aBufferSize)
+	unsigned int WavStreamInstance::getAudioRaw(float *aBuffer, unsigned int aSamplesToRead, unsigned int aBufferSize)
 	{			
 		unsigned int offset = 0;
 		float tmp[512 * MAX_CHANNELS];
@@ -258,11 +258,12 @@ namespace SoLoud
 					{
 						for (k = 0; k < mChannels; k++)
 						{
-							aBuffer[k * aSamplesToRead + i + j] = tmp[j * mCodec.mFlac->channels + k];
+							aBuffer[k * aBufferSize + i + j] = tmp[j * mCodec.mFlac->channels + k];
 						}
 					}
+					if (offset < i + blockSize)
+						break;
 				}
-				mOffset += offset;
 				return offset;
 			}
 			break;
@@ -279,11 +280,12 @@ namespace SoLoud
 					{
 						for (k = 0; k < mChannels; k++)
 						{
-							aBuffer[k * aSamplesToRead + i + j] = tmp[j * mCodec.mMp3->channels + k];
+							aBuffer[k * aBufferSize + i + j] = tmp[j * mCodec.mMp3->channels + k];
 						}
 					}
+					if (offset < i + blockSize)
+						break;
 				}
-				mOffset += offset;
 				return offset;
 			}
 		break;
@@ -292,7 +294,6 @@ namespace SoLoud
 				if (mOggFrameOffset < mOggFrameSize)
 				{
 					int b = getOggData(mOggOutputs, aBuffer, aSamplesToRead, aBufferSize, mOggFrameSize, mOggFrameOffset, mChannels);
-					mOffset += b;
 					offset += b;
 					mOggFrameOffset += b;
 				}
@@ -301,16 +302,14 @@ namespace SoLoud
 				{
 					mOggFrameSize = stb_vorbis_get_frame_float(mCodec.mOgg, NULL, &mOggOutputs);
 					mOggFrameOffset = 0;
+					if (mOggFrameSize == 0)
+						break;
 					int b = getOggData(mOggOutputs, aBuffer + offset, aSamplesToRead - offset, aBufferSize, mOggFrameSize, mOggFrameOffset, mChannels);
-					mOffset += b;
 					offset += b;
 					mOggFrameOffset += b;
 
-					if (mOffset >= mParent->mSampleCount || b == 0)
-					{
-						mOffset += offset;
-						return offset;
-					}
+					if (b == 0)
+						break;
 				}
 			}
 			break;
@@ -327,11 +326,12 @@ namespace SoLoud
 					{
 						for (k = 0; k < mChannels; k++)
 						{
-							aBuffer[k * aSamplesToRead + i + j] = tmp[j * mCodec.mWav->channels + k];
+							aBuffer[k * aBufferSize + i + j] = tmp[j * mCodec.mWav->channels + k];
 						}
 					}
+					if (offset < i + blockSize)
+						break;
 				}
-				mOffset += offset;
 				return offset;
 			}
 			break;
@@ -339,23 +339,118 @@ namespace SoLoud
 		return aSamplesToRead;
 	}
 
+	void WavStreamInstance::getLoopRangeFrames(unsigned int &aLoopStart, unsigned int &aLoopEnd)
+	{
+		aLoopStart = (unsigned int)floor(mLoopPoint * mParent->mBaseSamplerate);
+		aLoopEnd = mParent->mSampleCount;
+		if (mLoopEnd > 0)
+			aLoopEnd = (unsigned int)floor(mLoopEnd * mParent->mBaseSamplerate);
+		if (aLoopEnd > mParent->mSampleCount)
+			aLoopEnd = mParent->mSampleCount;
+		if (aLoopStart >= aLoopEnd)
+		{
+			aLoopStart = 0;
+			aLoopEnd = mParent->mSampleCount;
+		}
+	}
+
+	result WavStreamInstance::seekToFrame(unsigned int aFrame)
+	{
+		if (mFile == NULL)
+			return INVALID_PARAMETER;
+		if (aFrame > mParent->mSampleCount)
+			aFrame = mParent->mSampleCount;
+
+		switch (mParent->mFiletype)
+		{
+		case WAVSTREAM_OGG:
+			if (!mCodec.mOgg || !stb_vorbis_seek(mCodec.mOgg, aFrame))
+				return NOT_IMPLEMENTED;
+			mOggFrameSize = 0;
+			mOggFrameOffset = 0;
+			mOggOutputs = 0;
+			break;
+		case WAVSTREAM_FLAC:
+			if (!mCodec.mFlac || !drflac_seek_to_pcm_frame(mCodec.mFlac, aFrame))
+				return NOT_IMPLEMENTED;
+			break;
+		case WAVSTREAM_MP3:
+			if (!mCodec.mMp3 || !drmp3_seek_to_pcm_frame(mCodec.mMp3, aFrame))
+				return NOT_IMPLEMENTED;
+			break;
+		case WAVSTREAM_WAV:
+			if (!mCodec.mWav || !drwav_seek_to_pcm_frame(mCodec.mWav, aFrame))
+				return NOT_IMPLEMENTED;
+			break;
+		}
+
+		mOffset = aFrame;
+		mStreamPosition = (double)aFrame / mBaseSamplerate;
+		return SO_NO_ERROR;
+	}
+
+	unsigned int WavStreamInstance::getAudio(float *aBuffer, unsigned int aSamplesToRead, unsigned int aBufferSize)
+	{
+		if (mFile == NULL)
+			return 0;
+
+		bool looping = (mFlags & AudioSourceInstance::LOOPING) != 0;
+		unsigned int loopStart, loopEnd;
+		getLoopRangeFrames(loopStart, loopEnd);
+
+		if (looping && mOffset >= loopEnd)
+		{
+			if (seekToFrame(loopStart) != SO_NO_ERROR)
+				return 0;
+			mLoopCount++;
+		}
+
+		unsigned int written = 0;
+		float tmp[512 * MAX_CHANNELS];
+		while (written < aSamplesToRead)
+		{
+			unsigned int end = looping ? loopEnd : mParent->mSampleCount;
+			if (mOffset >= end)
+			{
+				if (!looping || loopEnd <= loopStart)
+					break;
+				if (seekToFrame(loopStart) != SO_NO_ERROR)
+					break;
+				mLoopCount++;
+			}
+
+			unsigned int wanted = end - mOffset;
+			if (wanted > aSamplesToRead - written)
+				wanted = aSamplesToRead - written;
+			if (wanted > 512)
+				wanted = 512;
+			if (wanted == 0)
+				break;
+
+			unsigned int got = getAudioRaw(tmp, wanted, wanted);
+			if (got == 0)
+				break;
+
+			unsigned int i, j;
+			for (i = 0; i < mChannels; i++)
+			{
+				memcpy(aBuffer + i * aBufferSize + written, tmp + i * wanted, sizeof(float) * got);
+			}
+			mOffset += got;
+			written += got;
+			if (got < wanted)
+				break;
+		}
+		return written;
+	}
+
 	result WavStreamInstance::seek(double aSeconds, float* mScratch, unsigned int mScratchSize)
 	{
-		if (mCodec.mOgg)
-		{
-			int pos = (int)floor(mBaseSamplerate * aSeconds);
-			stb_vorbis_seek(mCodec.mOgg, pos);
-			// Since the position that we just sought to might not be *exactly*
-			// the position we asked for, we're re-calculating the position just
-			// for the sake of correctness.
-			mOffset = stb_vorbis_get_sample_offset(mCodec.mOgg);
-			double newPosition = float(mOffset / mBaseSamplerate);
-			mStreamPosition = newPosition;
-			return 0;
-		}
-		else {
-			return AudioSourceInstance::seek(aSeconds, mScratch, mScratchSize);
-		}
+		if (aSeconds < 0)
+			return INVALID_PARAMETER;
+		(void)mScratch;
+		(void)mScratchSize;
+		return seekToFrame((unsigned int)floor(mBaseSamplerate * aSeconds));
 	}
 
 	result WavStreamInstance::rewind()

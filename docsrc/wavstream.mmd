@@ -132,6 +132,30 @@ queried with these functions.
 	snd.setLoopPoint(t + 1); // skip 1 second more when looping
 	...
 	snd.setLoopPoint(0); // loop from start
+
+### WavStream.setLoopRange(), WavStream.setLoopEnd(), WavStream.getLoopEnd(), WavStream.getLoopRange()
+
+Configure a complete loop region for all instances created from this
+stream. The end is exclusive and zero means end of stream. The stream
+is decoded only up to the loop end, then seeks to the loop start and
+continues in the same mix block, so no silent gap is inserted at the
+seam.
+
+	snd.setLooping(true);
+	snd.setLoopRange(1.0, 4.5);
+	handle h = soloud.play(snd);
+
+Codec seek accuracy is limited by the underlying decoder, but decoded
+sample counts and loop boundaries remain sample-accurate once the seek
+has completed. Invalid ranges are rejected as with Wav.
+
+### WavStream.setFadeIn(), WavStream.setFadeOut(), WavStream.getFadeIn(), WavStream.getFadeOut()
+
+Set the default fade-in time for newly played instances, and the default
+fade-out time used by `Soloud.stopWithFade(h)`.
+
+	snd.setFadeIn(0.05);
+	snd.setFadeOut(0.20);
 	
 
 ### Inherited 3d audio interfaces
@@ -146,4 +170,3 @@ Like all other audio sources, WavStream inherits the 3d audio interfaces. Please
 - WavStream.set3dDistanceDelay()
 - WavStream.set3dCollider()
 - WavStream.set3dAttenuator()
-              

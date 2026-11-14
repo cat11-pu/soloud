@@ -116,6 +116,7 @@ string latestline = "";
 string subs_str(string &aSrc)
 {
 	if (aSrc == "time") return string("double");
+	if (aSrc == "time *") return string("double *");
 	if (aSrc == "handle") return string("unsigned int");
 	if (aSrc == "bool") return string("int");
 	if (aSrc == "result") return string("int");
@@ -1141,5 +1142,4 @@ int main(int parc, char ** pars)
 
 	printf("All done.\n");
 }
-
 

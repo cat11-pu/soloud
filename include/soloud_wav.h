@@ -42,6 +42,7 @@ namespace SoLoud
 	public:
 		WavInstance(Wav *aParent);
 		virtual unsigned int getAudio(float *aBuffer, unsigned int aSamplesToRead, unsigned int aBufferSize);
+		virtual result seek(time aSeconds, float *mScratch, unsigned int mScratchSize);
 		virtual result rewind();
 		virtual bool hasEnded();
 	};
