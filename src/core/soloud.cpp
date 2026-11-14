@@ -36,6 +36,14 @@ freely, subject to the following restrictions:
 #ifdef _M_IX86
 #include <emmintrin.h>
 #endif
+#if defined(__SSE2__) || defined(__x86_64__) || defined(_M_X64)
+#include <emmintrin.h>
+#define SOLOUD_SSE2_INTRINSICS
+#endif
+#if defined(SOLOUD_SSE2_INTRINSICS) && defined(__GNUC__)
+#include <immintrin.h>
+#define SOLOUD_AVX2_DISPATCH
+#endif
 #endif
 
 //#define FLOATING_POINT_DEBUG
@@ -950,6 +958,10 @@ namespace SoLoud
 			);
 	}
 
+#ifdef SOLOUD_AVX2_DISPATCH
+	static int resample_linear_avx2(const float* aSrc, float* aDst, int aPos, int aCount, int aStep, int aIndex, int* aOutPos);
+#endif
+
 	static void resample_catmullrom(float* aSrc,
 		float* aSrc1,
 		float* aDst,
@@ -957,10 +969,13 @@ namespace SoLoud
 		int aDstSampleCount,
 		int aStepFixed)
 	{
-		int i;
+		int i = 0;
 		int pos = aSrcOffset;
 
-		for (i = 0; i < aDstSampleCount; i++, pos += aStepFixed)
+		// Leading samples may read the tail of the previous block. Once
+		// pos >= 3 << FIXPOINT_FRAC_BITS the reads never cross the block
+		// boundary again, because pos increases monotonically.
+		while (i < aDstSampleCount && pos < (3 << FIXPOINT_FRAC_BITS))
 		{
 			int p = pos >> FIXPOINT_FRAC_BITS;
 			int f = pos & FIXPOINT_FRAC_MASK;
@@ -969,7 +984,7 @@ namespace SoLoud
 
 			if (p < 3)
 			{
-				s3 = aSrc1[512 + p - 3];
+				s3 = aSrc1[SAMPLE_GRANULARITY + p - 3];
 			}
 			else
 			{
@@ -978,7 +993,7 @@ namespace SoLoud
 
 			if (p < 2)
 			{
-				s2 = aSrc1[512 + p - 2];
+				s2 = aSrc1[SAMPLE_GRANULARITY + p - 2];
 			}
 			else
 			{
@@ -987,7 +1002,7 @@ namespace SoLoud
 
 			if (p < 1)
 			{
-				s1 = aSrc1[512 + p - 1];
+				s1 = aSrc1[SAMPLE_GRANULARITY + p - 1];
 			}
 			else
 			{
@@ -996,7 +1011,24 @@ namespace SoLoud
 
 			s0 = aSrc[p];
 
-			aDst[i] = catmullrom(f / (float)FIXPOINT_FRAC_MUL, s3, s2, s1, s0);
+			// Division by a power of two is exact, so multiplying by the
+			// reciprocal yields bit-identical results.
+			aDst[i] = catmullrom(f * (1.0f / FIXPOINT_FRAC_MUL), s3, s2, s1, s0);
+			i++;
+			pos += aStepFixed;
+		}
+
+		for (; i < aDstSampleCount; i++, pos += aStepFixed)
+		{
+			int p = pos >> FIXPOINT_FRAC_BITS;
+			int f = pos & FIXPOINT_FRAC_MASK;
+
+			float s0 = aSrc[p];
+			float s1 = aSrc[p - 1];
+			float s2 = aSrc[p - 2];
+			float s3 = aSrc[p - 3];
+
+			aDst[i] = catmullrom(f * (1.0f / FIXPOINT_FRAC_MUL), s3, s2, s1, s0);
 		}
 	}
 
@@ -1007,10 +1039,59 @@ namespace SoLoud
 		int aDstSampleCount,
 		int aStepFixed)
 	{
-		int i;
+		int i = 0;
 		int pos = aSrcOffset;
 
-		for (i = 0; i < aDstSampleCount; i++, pos += aStepFixed)
+		// Leading samples interpolate against the last sample of the
+		// previous block. Once pos >= FIXPOINT_FRAC_MUL, p is never 0
+		// again because pos increases monotonically.
+		if (pos < FIXPOINT_FRAC_MUL)
+		{
+			float s1 = aSrc1[SAMPLE_GRANULARITY - 1];
+			while (i < aDstSampleCount && pos < FIXPOINT_FRAC_MUL)
+			{
+				int f = pos & FIXPOINT_FRAC_MASK;
+				float s2 = aSrc[0];
+				aDst[i] = s1 + (s2 - s1) * f * (1 / (float)FIXPOINT_FRAC_MUL);
+				i++;
+				pos += aStepFixed;
+			}
+		}
+
+#ifdef SOLOUD_SSE2_INTRINSICS
+		{
+			// 4-wide version of the scalar loop below. Each lane performs
+			// exactly the same float operations in the same order (sub,
+			// mul, mul, add), so results are bit-identical to the scalar
+			// path.
+			__m128 scale = _mm_set1_ps(1.0f / FIXPOINT_FRAC_MUL);
+			for (; i + 4 <= aDstSampleCount; i += 4)
+			{
+				int p0 = pos >> FIXPOINT_FRAC_BITS;
+				int f0 = pos & FIXPOINT_FRAC_MASK;
+				pos += aStepFixed;
+				int p1 = pos >> FIXPOINT_FRAC_BITS;
+				int f1 = pos & FIXPOINT_FRAC_MASK;
+				pos += aStepFixed;
+				int p2 = pos >> FIXPOINT_FRAC_BITS;
+				int f2 = pos & FIXPOINT_FRAC_MASK;
+				pos += aStepFixed;
+				int p3 = pos >> FIXPOINT_FRAC_BITS;
+				int f3 = pos & FIXPOINT_FRAC_MASK;
+				pos += aStepFixed;
+
+				__m128 s1 = _mm_set_ps(aSrc[p3 - 1], aSrc[p2 - 1], aSrc[p1 - 1], aSrc[p0 - 1]);
+				__m128 s2 = _mm_set_ps(aSrc[p3], aSrc[p2], aSrc[p1], aSrc[p0]);
+				__m128 f = _mm_cvtepi32_ps(_mm_set_epi32(f3, f2, f1, f0));
+				__m128 r = _mm_mul_ps(_mm_sub_ps(s2, s1), f);
+				r = _mm_mul_ps(r, scale);
+				r = _mm_add_ps(s1, r);
+				_mm_storeu_ps(aDst + i, r);
+			}
+		}
+#endif
+
+		for (; i < aDstSampleCount; i++, pos += aStepFixed)
 		{
 			int p = pos >> FIXPOINT_FRAC_BITS;
 			int f = pos & FIXPOINT_FRAC_MASK;
@@ -1021,12 +1102,8 @@ namespace SoLoud
 				p = SAMPLE_GRANULARITY - 1;
 			}
 #endif
-			float s1 = aSrc1[SAMPLE_GRANULARITY - 1];
+			float s1 = aSrc[p - 1];
 			float s2 = aSrc[p];
-			if (p != 0)
-			{
-				s1 = aSrc[p - 1];
-			}
 			aDst[i] = s1 + (s2 - s1) * f * (1 / (float)FIXPOINT_FRAC_MUL);
 		}
 	}
@@ -1047,6 +1124,50 @@ namespace SoLoud
 			aDst[i] = aSrc[p];
 		}
 	}
+
+#ifdef SOLOUD_AVX2_DISPATCH
+	// AVX2 fast path for resample_linear, runtime dispatched.
+	// Requires: (aPos >> FIXPOINT_FRAC_BITS) >= 1 and aStep <= FIXPOINT_FRAC_MUL.
+	// Each lane performs exactly the same float operations in the same order
+	// as the scalar loop (sub, mul, mul, add), so results are bit-identical.
+	__attribute__((target("avx2")))
+	static int resample_linear_avx2(const float* aSrc, float* aDst, int aPos, int aCount, int aStep, int aIndex, int* aOutPos)
+	{
+		int i = aIndex;
+		int pos = aPos;
+		__m256 scale = _mm256_set1_ps(1.0f / FIXPOINT_FRAC_MUL);
+		__m256i posv = _mm256_add_epi32(
+			_mm256_set1_epi32(pos),
+			_mm256_mullo_epi32(_mm256_setr_epi32(0, 1, 2, 3, 4, 5, 6, 7), _mm256_set1_epi32(aStep)));
+		__m256i step8 = _mm256_set1_epi32(aStep * 8);
+		__m256i fracmask = _mm256_set1_epi32(FIXPOINT_FRAC_MASK);
+
+		for (; i + 8 <= aCount; i += 8)
+		{
+			int p0 = pos >> FIXPOINT_FRAC_BITS;
+			// Window loads must stay inside the SAMPLE_GRANULARITY block
+			if (p0 + 8 > SAMPLE_GRANULARITY)
+				break;
+			__m256i pv = _mm256_srai_epi32(posv, FIXPOINT_FRAC_BITS);
+			__m256i fv = _mm256_and_si256(posv, fracmask);
+			// Lane indices are in 0..7 because aStep <= FIXPOINT_FRAC_MUL
+			__m256i idx = _mm256_sub_epi32(pv, _mm256_set1_epi32(p0));
+			__m256 s2v = _mm256_loadu_ps(aSrc + p0);
+			__m256 s1v = _mm256_loadu_ps(aSrc + p0 - 1);
+			__m256 s2 = _mm256_permutevar8x32_ps(s2v, idx);
+			__m256 s1 = _mm256_permutevar8x32_ps(s1v, idx);
+			__m256 f = _mm256_cvtepi32_ps(fv);
+			__m256 r = _mm256_mul_ps(_mm256_sub_ps(s2, s1), f);
+			r = _mm256_mul_ps(r, scale);
+			r = _mm256_add_ps(s1, r);
+			_mm256_storeu_ps(aDst + i, r);
+			posv = _mm256_add_epi32(posv, step8);
+			pos += aStep * 8;
+		}
+		*aOutPos = pos;
+		return i;
+	}
+#endif
 
 
 
@@ -1603,12 +1724,9 @@ namespace SoLoud
 	{
 		unsigned int i, j;
 		// Clear accumulation buffer
-		for (i = 0; i < aSamplesToRead; i++)
+		for (j = 0; j < aChannels; j++)
 		{
-			for (j = 0; j < aChannels; j++)
-			{
-				aBuffer[i + j * aBufferSize] = 0;
-			}
+			memset(aBuffer + j * aBufferSize, 0, sizeof(float) * aSamplesToRead);
 		}
 
 		// Accumulate sound sources		
