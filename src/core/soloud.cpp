@@ -53,6 +53,12 @@ freely, subject to the following restrictions:
 
 namespace SoLoud
 {
+	static bool isValidChannelCount(unsigned int aChannels)
+	{
+		return aChannels == 1 || aChannels == 2 || aChannels == 4 ||
+			aChannels == 6 || aChannels == 8;
+	}
+
 	AlignedFloatBuffer::AlignedFloatBuffer()
 	{
 		mBasePtr = 0;
@@ -202,11 +208,18 @@ namespace SoLoud
 		if (mAudioThreadMutex)
 			Thread::destroyMutex(mAudioThreadMutex);
 		mAudioThreadMutex = NULL;
+		delete[] mResampleData;
+		mResampleData = NULL;
+		delete[] mResampleDataOwner;
+		mResampleDataOwner = NULL;
 	}
 
 	result Soloud::init(unsigned int aFlags, unsigned int aBackend, unsigned int aSamplerate, unsigned int aBufferSize, unsigned int aChannels)
 	{		
-		if (aBackend >= BACKEND_MAX || aChannels == 3 || aChannels == 5 || aChannels == 7 || aChannels > MAX_CHANNELS)
+		if (aBackend >= BACKEND_MAX ||
+			!isValidChannelCount(aChannels) ||
+			(aSamplerate != Soloud::AUTO && aSamplerate > SOLOUD_MAX_SAMPLERATE) ||
+			(aBufferSize != Soloud::AUTO && aBufferSize > SOLOUD_MAX_BUFFER_SIZE))
 			return INVALID_PARAMETER;
 
 		deinit();
@@ -216,8 +229,8 @@ namespace SoLoud
 		mBackendID = 0;
 		mBackendString = 0;
 
-		int samplerate = 44100;
-		int buffersize = 2048;
+		unsigned int samplerate = 44100;
+		unsigned int buffersize = 2048;
 		int inited = 0;
 
 		if (aSamplerate != Soloud::AUTO) samplerate = aSamplerate;
@@ -2253,6 +2266,8 @@ namespace SoLoud
 
 	void Soloud::mix(float *aBuffer, unsigned int aSamples)
 	{
+		if (aSamples == 0)
+			return;
 		unsigned int stride = (aSamples + 15) & ~0xf;
 		mix_internal(aSamples, stride);
 		interlace_samples_float(mScratch.mData, aBuffer, aSamples, mChannels, stride);
@@ -2260,6 +2275,8 @@ namespace SoLoud
 
 	void Soloud::mixSigned16(short *aBuffer, unsigned int aSamples)
 	{
+		if (aSamples == 0)
+			return;
 		unsigned int stride = (aSamples + 15) & ~0xf;
 		mix_internal(aSamples, stride);
 		interlace_samples_s16(mScratch.mData, aBuffer, aSamples, mChannels, stride);

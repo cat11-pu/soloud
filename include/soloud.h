@@ -94,6 +94,10 @@ freely, subject to the following restrictions:
 // Default resampler for both main and bus mixers
 #define SOLOUD_DEFAULT_RESAMPLER SoLoud::Soloud::RESAMPLER_LINEAR
 
+// Upper bounds used to reject inputs that would overflow internal size math
+#define SOLOUD_MAX_SAMPLERATE 768000
+#define SOLOUD_MAX_BUFFER_SIZE 1048576
+
 //
 /////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////

@@ -344,7 +344,9 @@ namespace SoLoud
 
 	result Wav::loadRawWave8(unsigned char *aMem, unsigned int aLength, float aSamplerate, unsigned int aChannels)
 	{
-		if (aMem == 0 || aLength == 0 || aSamplerate <= 0 || aChannels < 1)
+		if (aMem == 0 || aLength == 0 || aLength < aChannels ||
+			!(aSamplerate > 0) || aSamplerate > SOLOUD_MAX_SAMPLERATE ||
+			aChannels < 1 || aChannels > MAX_CHANNELS)
 			return INVALID_PARAMETER;
 		stop();
 		delete[] mData;
@@ -360,7 +362,9 @@ namespace SoLoud
 
 	result Wav::loadRawWave16(short *aMem, unsigned int aLength, float aSamplerate, unsigned int aChannels)
 	{
-		if (aMem == 0 || aLength == 0 || aSamplerate <= 0 || aChannels < 1)
+		if (aMem == 0 || aLength == 0 || aLength < aChannels ||
+			!(aSamplerate > 0) || aSamplerate > SOLOUD_MAX_SAMPLERATE ||
+			aChannels < 1 || aChannels > MAX_CHANNELS)
 			return INVALID_PARAMETER;
 		stop();
 		delete[] mData;
@@ -376,7 +380,9 @@ namespace SoLoud
 
 	result Wav::loadRawWave(float *aMem, unsigned int aLength, float aSamplerate, unsigned int aChannels, bool aCopy, bool aTakeOwndership)
 	{
-		if (aMem == 0 || aLength == 0 || aSamplerate <= 0 || aChannels < 1)
+		if (aMem == 0 || aLength == 0 || aLength < aChannels ||
+			!(aSamplerate > 0) || aSamplerate > SOLOUD_MAX_SAMPLERATE ||
+			aChannels < 1 || aChannels > MAX_CHANNELS)
 			return INVALID_PARAMETER;
 		stop();
 		delete[] mData;
