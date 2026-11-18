@@ -35,3 +35,9 @@ scripts/soloud_codegen.py
 glue/rpgmaker_soloud.rb
 *.lastcodeanalysissucceeded
 *.bak
+
+# Fault-injection test artifacts
+tests/fault_injection/fault_injection_test
+tests/fault_injection/soloud_stress
+tests/fault_injection/libsoloud_null.a
+tests/fault_injection/.solibuild/
