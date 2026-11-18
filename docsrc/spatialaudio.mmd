@@ -1,0 +1,175 @@
+## Spatial Audio
+
+`SoLoud::SpatialAudio` is a sample-accurate positional processor for a mono
+source. It combines distance attenuation, occlusion, constant-power stereo
+panning, and a short interaural time difference (ITD). It is independent of
+SoLoud's speaker-based 3d mixer, so a game can use it for a binaural output
+path without changing the existing `play3d()` behavior.
+
+The processor owns a fixed 256-sample delay line and does not allocate after
+construction. Parameter setters only publish targets. Rendering moves the
+current gains and delay one sample at a time, which keeps block boundaries and
+live scene switches continuous.
+
+### Coordinates
+
+The default listener looks down `-Z` with `+Y` up, matching SoLoud's default
+right-handed 3d convention:
+
+    forward = (0, 0, -1)
+    up      = (0, 1, 0)
+    right   = normalize(cross(forward, up)) = (1, 0, 0)
+
+Positive azimuth is to the right. The lateral pan value is:
+
+    pan = sin(azimuth) * cos(elevation)
+
+This means a source directly overhead or behind the listener is centered,
+while sources to the side reach `pan = -1` or `pan = +1`.
+
+### Basic Use
+
+    SoLoud::SpatialAudio spatial;
+    spatial.init(48000);
+    spatial.setSmoothingTime(0.02f);
+
+    SoLoud::SpatialAudio::Scene scene;
+    scene.listener.position = SoLoud::SpatialAudio::Vec3(px, py, pz);
+    scene.listener.forward = SoLoud::SpatialAudio::Vec3(fx, fy, fz);
+    scene.listener.up = SoLoud::SpatialAudio::Vec3(0, 1, 0);
+
+    scene.source.position = SoLoud::SpatialAudio::Vec3(sx, sy, sz);
+    scene.source.minDistance = 1.0f;
+    scene.source.maxDistance = 80.0f;
+    scene.source.rolloff = 1.0f;
+    scene.source.occlusion = 0.35f;
+    scene.source.distanceModel =
+        SoLoud::SpatialAudio::INVERSE_DISTANCE;
+
+    spatial.switchScene(scene);
+
+    // Mono in, planar stereo out.
+    spatial.processPlanar(input, outputLeft, outputRight, frames);
+
+For interleaved stereo output:
+
+    spatial.process(input, outputInterleavedStereo, frames);
+
+`process()` and `processPlanar()` must not overlap input and output. Input and
+output must remain valid for `frames` samples.
+
+### Interface
+
+    result init(unsigned int sampleRate = 48000,
+                float maxItdSeconds = 0.00066f);
+    result switchScene(const Scene &scene);
+    result setListener(const Listener &listener);
+    result setSource(const Source &source);
+    result setSourcePosition(float x, float y, float z);
+    result setDistanceModel(unsigned int model, float rolloff);
+    result setMinMaxDistance(float minDistance, float maxDistance);
+    result setOcclusion(float occlusion);
+    result setSmoothingTime(float seconds);
+
+    bool process(const float *input, float *interleavedStereo,
+                 unsigned int frames);
+    bool processPlanar(const float *input, float *left, float *right,
+                       unsigned int frames);
+
+`switchScene()` changes the listener and source together and then computes one
+target frame. It never resets the current gains or delay line. This is the
+preferred scene-transition entry point.
+
+`setSmoothingTime()` sets the time constant of a per-sample one-pole smoother.
+The default is 20 ms. Zero means immediate changes and is intended for
+initialization or a deliberate hard cut.
+
+`snapToTarget()` moves current parameters to the target without clearing the
+delay line. `reset()` also clears the delay line and is intentionally a hard
+discontinuity; `switchScene()` never calls it.
+
+### Output Frame
+
+`getCurrentFrame()` returns the current smoothed values. `getTargetFrame()`
+returns the values computed from the latest scene. Both provide:
+
+* `distance`, `azimuth`, `elevation`, `pan`
+* `distanceGain`, `occlusionGain`, combined `gain`
+* `gainLeft`, `gainRight`
+* `delayLeftSeconds`, `delayRightSeconds`
+* `delayLeftSamples`, `delayRightSamples`
+
+The near ear always has zero ITD. Constant-power panning uses:
+
+    angle      = (pan + 1) * pi / 4
+    gainLeft   = cos(angle) * distanceGain * occlusionGain
+    gainRight  = sin(angle) * distanceGain * occlusionGain
+    delayFar   = 0.00066 * abs(pan) seconds
+
+### Distance Models
+
+For `d = clamp(distance, minDistance, maxDistance)`:
+
+* `NO_ATTENUATION`: `1`
+* `INVERSE_DISTANCE`: `minDistance /
+  (minDistance + rolloff * (d - minDistance))`
+* `LINEAR_DISTANCE`: `1 - rolloff *
+  (d - minDistance) / (maxDistance - minDistance)`
+* `EXPONENTIAL_DISTANCE`: `pow(d / minDistance, -rolloff)`
+
+Results are clamped to `[0, 1]`. The static
+`calculateDistanceGain()` helper sanitizes invalid values without throwing:
+it uses a positive minimum distance, orders min/max, ignores a negative
+rolloff, and returns zero for a non-finite result.
+
+### Edge Cases
+
+The setters reject the whole scene and leave the previous target unchanged if
+any of these conditions is present:
+
+* A listener/source coordinate is NaN or infinity.
+* `minDistance <= 0`.
+* `maxDistance < minDistance`.
+* `rolloff < 0` or is non-finite.
+* `occlusion` is outside `[0, 1]` or is non-finite.
+* The distance model is not one of the four enum values.
+* The listener forward vector has zero length.
+* Smoothing time is negative or non-finite.
+* Sample rate is zero.
+
+Additional defined behavior:
+
+* A source exactly at the listener has distance zero and is centered.
+* `minDistance == maxDistance` is valid. Linear attenuation then returns one
+  inside the clamped interval instead of dividing by zero.
+* A zero or parallel up vector is replaced by a stable orthogonal basis.
+* Non-finite input samples are rendered as silence.
+* Zero-frame processing is valid and does not change state.
+* Null buffers return `false`.
+* All gains are finite, non-negative, and bounded by one. Delay is bounded by
+  `MAX_DELAY_SAMPLES - 2`.
+
+The class is not internally synchronized. Calls to setters and rendering must
+be serialized by the host, for example by using the same audio-thread update
+point for all control changes.
+
+### Verification
+
+Run:
+
+    tests/run_spatialaudio.sh
+
+The test covers panning geometry, all distance models, invalid parameters,
+degenerate directions, block-size invariance, scene-boundary continuity, and
+10,000 scene/parameter updates. The allocation counter verifies that the
+update loop performs no allocations.
+
+The generated table is `artifacts/spatial_audio_panning.csv`. It contains
+azimuth `-180..180` in 10-degree steps and elevation `-30..60` in 15-degree
+steps. Columns are:
+
+    azimuth_deg,elevation_deg,pan,gain_left,gain_right,
+    itd_left_ms,itd_right_ms
+
+The table uses distance `1`, `minDistance = 1`, and no occlusion, so its gains
+show only the binaural panning stage.
