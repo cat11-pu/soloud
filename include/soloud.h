@@ -94,6 +94,13 @@ freely, subject to the following restrictions:
 // Default resampler for both main and bus mixers
 #define SOLOUD_DEFAULT_RESAMPLER SoLoud::Soloud::RESAMPLER_LINEAR
 
+// Sanity limits for engine initialization parameters. These reject values
+// which would overflow internal size arithmetic or destabilize resampling.
+#define SOLOUD_MIN_SAMPLERATE 8000
+#define SOLOUD_MAX_SAMPLERATE 384000
+#define SOLOUD_MIN_BUFFER_SIZE 16
+#define SOLOUD_MAX_BUFFER_SIZE (1 << 20)
+
 //
 /////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////
@@ -351,8 +358,9 @@ namespace SoLoud
 		result setRelativePlaySpeed(handle aVoiceHandle, float aSpeed);
 		// Set the voice protection state
 		void setProtectVoice(handle aVoiceHandle, bool aProtect);
-		// Set the sample rate
-		void setSamplerate(handle aVoiceHandle, float aSamplerate);
+		// Set the sample rate. Returns INVALID_PARAMETER for invalid handles,
+		// non-positive, NaN or out-of-range values.
+		result setSamplerate(handle aVoiceHandle, float aSamplerate);
 		// Set panning value; -1 is left, 0 is center, 1 is right
 		void setPan(handle aVoiceHandle, float aPan);
 		// Set absolute left/right volumes

@@ -32,7 +32,7 @@ namespace SoLoud
 	{
 		SOLOUD_ASSERT(aVoice < VOICE_COUNT);
 		SOLOUD_ASSERT(mInsideAudioThreadMutex);
-		if (aSpeed <= 0.0f)
+		if (!(aSpeed > 0.0f) || aSpeed > 1.0e6f)
 		{
 			return INVALID_PARAMETER;
 		}

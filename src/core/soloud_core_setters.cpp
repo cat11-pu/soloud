@@ -47,20 +47,33 @@ namespace SoLoud
 
 	result Soloud::setRelativePlaySpeed(handle aVoiceHandle, float aSpeed)
 	{
+		if (!(aSpeed > 0.0f) || aSpeed > 1.0e6f)
+			return INVALID_PARAMETER;
+
+		int handled = 0;
 		result retVal = 0;
 		FOR_ALL_VOICES_PRE
+			handled = 1;
 			mVoice[ch]->mRelativePlaySpeedFader.mActive = 0;
 			retVal = setVoiceRelativePlaySpeed_internal(ch, aSpeed);
 			FOR_ALL_VOICES_POST
-		return retVal;
+		return handled ? retVal : INVALID_PARAMETER;
 	}
 
-	void Soloud::setSamplerate(handle aVoiceHandle, float aSamplerate)
+	result Soloud::setSamplerate(handle aVoiceHandle, float aSamplerate)
 	{
+		// Reject values that would make the fixed-point resampler step zero,
+		// negative or large enough to overflow.
+		if (!(aSamplerate > 0.0f) || aSamplerate > 1.0e7f)
+			return INVALID_PARAMETER;
+
+		int handled = 0;
 		FOR_ALL_VOICES_PRE
+			handled = 1;
 			mVoice[ch]->mBaseSamplerate = aSamplerate;
 			updateVoiceRelativePlaySpeed_internal(ch);
 		FOR_ALL_VOICES_POST
+		return handled ? SO_NO_ERROR : INVALID_PARAMETER;
 	}
 
 	void Soloud::setPause(handle aVoiceHandle, bool aPause)

@@ -31,6 +31,9 @@ namespace SoLoud
 {
 	handle Soloud::play(AudioSource &aSound, float aVolume, float aPan, bool aPaused, unsigned int aBus)
 	{
+		if (mAudioThreadMutex == NULL)
+			return 0;
+
 		if (aSound.mFlags & AudioSource::SINGLE_INSTANCE)
 		{
 			// Only one instance allowed, stop others
@@ -41,6 +44,8 @@ namespace SoLoud
 		// so let's not do it inside the audio thread mutex.
 		aSound.mSoloud = this;
 		SoLoud::AudioSourceInstance *instance = aSound.createInstance();
+		if (instance == NULL)
+			return 0;
 
 		lockAudioMutex_internal();
 		int ch = findFreeVoice_internal();
@@ -139,14 +144,19 @@ namespace SoLoud
 
 	result Soloud::seek(handle aVoiceHandle, time aSeconds)
 	{
+		if (!(aSeconds >= 0.0) || aSeconds > 1.0e300)
+			return INVALID_PARAMETER;
+
+		int handled = 0;
 		result res = SO_NO_ERROR;
 		result singleres = SO_NO_ERROR;
 		FOR_ALL_VOICES_PRE
+			handled = 1;
 			singleres = mVoice[ch]->seek(aSeconds, mScratch.mData, mScratchSize);
 		if (singleres != SO_NO_ERROR)
 			res = singleres;
 		FOR_ALL_VOICES_POST
-		return res;
+		return handled ? res : INVALID_PARAMETER;
 	}
 
 

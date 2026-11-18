@@ -165,7 +165,7 @@ typedef void * File;
 /*
  * Soloud
  */
-void Soloud_destroy(Soloud * aSoloud);
+int Soloud_destroy(Soloud * aSoloud);
 Soloud * Soloud_create();
 int Soloud_init(Soloud * aSoloud);
 int Soloud_initEx(Soloud * aSoloud, unsigned int aFlags /* = Soloud::CLIP_ROUNDOFF */, unsigned int aBackend /* = Soloud::AUTO */, unsigned int aSamplerate /* = Soloud::AUTO */, unsigned int aBufferSize /* = Soloud::AUTO */, unsigned int aChannels /* = 2 */);
@@ -229,7 +229,7 @@ void Soloud_setPause(Soloud * aSoloud, unsigned int aVoiceHandle, int aPause);
 void Soloud_setPauseAll(Soloud * aSoloud, int aPause);
 int Soloud_setRelativePlaySpeed(Soloud * aSoloud, unsigned int aVoiceHandle, float aSpeed);
 void Soloud_setProtectVoice(Soloud * aSoloud, unsigned int aVoiceHandle, int aProtect);
-void Soloud_setSamplerate(Soloud * aSoloud, unsigned int aVoiceHandle, float aSamplerate);
+int Soloud_setSamplerate(Soloud * aSoloud, unsigned int aVoiceHandle, float aSamplerate);
 void Soloud_setPan(Soloud * aSoloud, unsigned int aVoiceHandle, float aPan);
 void Soloud_setPanAbsolute(Soloud * aSoloud, unsigned int aVoiceHandle, float aLVolume, float aRVolume);
 void Soloud_setChannelVolume(Soloud * aSoloud, unsigned int aVoiceHandle, unsigned int aChannel, float aVolume);
@@ -758,4 +758,3 @@ void WavStream_stop(WavStream * aWavStream);
 #endif
 
 #endif // SOLOUD_C_H_INCLUDED
-

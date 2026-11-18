@@ -50,7 +50,7 @@ namespace SoLoud
 
 	handle Soloud::getHandleFromVoice_internal(unsigned int aVoice) const
 	{
-		if (mVoice[aVoice] == 0)
+		if (aVoice >= VOICE_COUNT || mVoice[aVoice] == 0)
 			return 0;
 		return (aVoice + 1) | (mVoice[aVoice]->mPlayIndex << 12);
 	}
@@ -68,6 +68,10 @@ namespace SoLoud
 
 		int ch = (aVoiceHandle & 0xfff) - 1;
 		unsigned int idx = aVoiceHandle >> 12;
+		// Handles carry a 12-bit voice slot, but only VOICE_COUNT slots exist.
+		// Reject the rest before indexing mVoice[].
+		if (ch < 0 || ch >= VOICE_COUNT)
+			return -1;
 		if (mVoice[ch] &&
 			(mVoice[ch]->mPlayIndex & 0xfffff) == idx)
 		{

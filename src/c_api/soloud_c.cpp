@@ -58,19 +58,51 @@ freely, subject to the following restrictions:
 #include "../include/soloud_waveshaperfilter.h"
 #include "../include/soloud_wavstream.h"
 
+#include <mutex>
+#include <new>
+#include <set>
+
 using namespace SoLoud;
+
+namespace
+{
+	std::mutex gSoloudInstanceMutex;
+	std::set<void *> gSoloudInstances;
+
+	void registerSoloudInstance(void *aInstance)
+	{
+		std::lock_guard<std::mutex> lock(gSoloudInstanceMutex);
+		gSoloudInstances.insert(aInstance);
+	}
+
+	int destroySoloudInstance(void *aInstance)
+	{
+		std::lock_guard<std::mutex> lock(gSoloudInstanceMutex);
+		std::set<void *>::iterator it = gSoloudInstances.find(aInstance);
+		if (it == gSoloudInstances.end())
+			return INVALID_PARAMETER;
+		gSoloudInstances.erase(it);
+		delete (Soloud *)aInstance;
+		return SO_NO_ERROR;
+	}
+}
 
 extern "C"
 {
 
-void Soloud_destroy(void * aClassPtr)
+int Soloud_destroy(void * aClassPtr)
 {
-  delete (Soloud *)aClassPtr;
+  if (aClassPtr == 0)
+    return INVALID_PARAMETER;
+  return destroySoloudInstance(aClassPtr);
 }
 
 void * Soloud_create()
 {
-  return (void *)new Soloud;
+  Soloud *instance = new (std::nothrow) Soloud;
+  if (instance)
+    registerSoloudInstance(instance);
+  return (void *)instance;
 }
 
 int Soloud_init(void * aClassPtr)
@@ -445,10 +477,10 @@ void Soloud_setProtectVoice(void * aClassPtr, unsigned int aVoiceHandle, int aPr
 	cl->setProtectVoice(aVoiceHandle, !!aProtect);
 }
 
-void Soloud_setSamplerate(void * aClassPtr, unsigned int aVoiceHandle, float aSamplerate)
+int Soloud_setSamplerate(void * aClassPtr, unsigned int aVoiceHandle, float aSamplerate)
 {
 	Soloud * cl = (Soloud *)aClassPtr;
-	cl->setSamplerate(aVoiceHandle, aSamplerate);
+	return cl->setSamplerate(aVoiceHandle, aSamplerate);
 }
 
 void Soloud_setPan(void * aClassPtr, unsigned int aVoiceHandle, float aPan)
@@ -2992,4 +3024,3 @@ void WavStream_stop(void * aClassPtr)
 }
 
 } // extern "C"
-

@@ -82,7 +82,8 @@ namespace SoLoud
 
 	void AlignedFloatBuffer::clear()
 	{
-		memset(mData, 0, sizeof(float) * mFloats);
+		if (mData)
+			memset(mData, 0, sizeof(float) * mFloats);
 	}
 
 	AlignedFloatBuffer::~AlignedFloatBuffer()
@@ -199,25 +200,50 @@ namespace SoLoud
 		if (mBackendCleanupFunc)
 			mBackendCleanupFunc(this);
 		mBackendCleanupFunc = 0;
+		mBackendPauseFunc = 0;
+		mBackendResumeFunc = 0;
+		mBackendData = 0;
+		mBackendID = 0;
+		mBackendString = 0;
+
+		// These arrays are allocated by postinit_internal() on every init.
+		// Release them here so repeated init/deinit cycles do not leak.
+		delete[] mResampleData;
+		mResampleData = NULL;
+		delete[] mResampleDataOwner;
+		mResampleDataOwner = NULL;
+
 		if (mAudioThreadMutex)
 			Thread::destroyMutex(mAudioThreadMutex);
 		mAudioThreadMutex = NULL;
+
+		mSamplerate = 0;
+		mBufferSize = 0;
+		mScratchSize = 0;
+		mActiveVoiceCount = 0;
+		mActiveVoiceDirty = true;
 	}
 
 	result Soloud::init(unsigned int aFlags, unsigned int aBackend, unsigned int aSamplerate, unsigned int aBufferSize, unsigned int aChannels)
 	{		
-		if (aBackend >= BACKEND_MAX || aChannels == 3 || aChannels == 5 || aChannels == 7 || aChannels > MAX_CHANNELS)
+		if (aBackend >= BACKEND_MAX ||
+			(aFlags & ~(Soloud::CLIP_ROUNDOFF | Soloud::ENABLE_VISUALIZATION | Soloud::LEFT_HANDED_3D | Soloud::NO_FPU_REGISTER_CHANGE)) != 0 ||
+			aChannels == 0 || aChannels == 3 || aChannels == 5 || aChannels == 7 || aChannels > MAX_CHANNELS ||
+			(aSamplerate != Soloud::AUTO && (aSamplerate < SOLOUD_MIN_SAMPLERATE || aSamplerate > SOLOUD_MAX_SAMPLERATE)) ||
+			(aBufferSize != Soloud::AUTO && (aBufferSize < SOLOUD_MIN_BUFFER_SIZE || aBufferSize > SOLOUD_MAX_BUFFER_SIZE)))
 			return INVALID_PARAMETER;
 
 		deinit();
 
 		mAudioThreadMutex = Thread::createMutex();
+		if (mAudioThreadMutex == NULL)
+			return OUT_OF_MEMORY;
 
 		mBackendID = 0;
 		mBackendString = 0;
 
-		int samplerate = 44100;
-		int buffersize = 2048;
+		unsigned int samplerate = 44100;
+		unsigned int buffersize = 2048;
 		int inited = 0;
 
 		if (aSamplerate != Soloud::AUTO) samplerate = aSamplerate;
@@ -731,7 +757,7 @@ namespace SoLoud
 
 	float Soloud::getApproximateVolume(unsigned int aChannel)
 	{
-		if (aChannel > mChannels)
+		if (aChannel >= mChannels || aChannel >= MAX_CHANNELS)
 			return 0;
 		float vol = 0;
 		lockAudioMutex_internal();
@@ -2253,6 +2279,8 @@ namespace SoLoud
 
 	void Soloud::mix(float *aBuffer, unsigned int aSamples)
 	{
+		if (aBuffer == NULL || aSamples == 0 || aSamples > mScratchSize)
+			return;
 		unsigned int stride = (aSamples + 15) & ~0xf;
 		mix_internal(aSamples, stride);
 		interlace_samples_float(mScratch.mData, aBuffer, aSamples, mChannels, stride);
@@ -2260,6 +2288,8 @@ namespace SoLoud
 
 	void Soloud::mixSigned16(short *aBuffer, unsigned int aSamples)
 	{
+		if (aBuffer == NULL || aSamples == 0 || aSamples > mScratchSize)
+			return;
 		unsigned int stride = (aSamples + 15) & ~0xf;
 		mix_internal(aSamples, stride);
 		interlace_samples_s16(mScratch.mData, aBuffer, aSamples, mChannels, stride);

@@ -97,6 +97,9 @@ namespace SoLoud
 
 	result nosound_init(Soloud *aSoloud, unsigned int aFlags, unsigned int aSamplerate, unsigned int aBuffer, unsigned int aChannels)
     {
+		if (aSamplerate == 0 || aBuffer == 0 || aChannels == 0)
+			return INVALID_PARAMETER;
+
 		SoLoudNosoundData*data = new SoLoudNosoundData;		
 		aSoloud->mBackendData = data;
         aSoloud->mBackendCleanupFunc = nosoundCleanup;
@@ -109,6 +112,8 @@ namespace SoLoud
         data->mThreadHandle = Thread::createThread(nosoundThread, data);
         if (0 == data->mThreadHandle)
         {
+			nosoundCleanup(aSoloud);
+			aSoloud->mBackendCleanupFunc = 0;
             return UNKNOWN_ERROR;
         }
         aSoloud->mBackendString = "NoSound";
