@@ -957,10 +957,13 @@ namespace SoLoud
 		int aDstSampleCount,
 		int aStepFixed)
 	{
-		int i;
+		int i = 0;
 		int pos = aSrcOffset;
 
-		for (i = 0; i < aDstSampleCount; i++, pos += aStepFixed)
+		// Head: samples that read from the previous block. Since the read
+		// position advances monotonically, this only affects the first few
+		// output samples; the main loop below is branch-free.
+		while (i < aDstSampleCount && (pos >> FIXPOINT_FRAC_BITS) < 3)
 		{
 			int p = pos >> FIXPOINT_FRAC_BITS;
 			int f = pos & FIXPOINT_FRAC_MASK;
@@ -997,6 +1000,15 @@ namespace SoLoud
 			s0 = aSrc[p];
 
 			aDst[i] = catmullrom(f / (float)FIXPOINT_FRAC_MUL, s3, s2, s1, s0);
+			i++;
+			pos += aStepFixed;
+		}
+
+		for (; i < aDstSampleCount; i++, pos += aStepFixed)
+		{
+			int p = pos >> FIXPOINT_FRAC_BITS;
+			int f = pos & FIXPOINT_FRAC_MASK;
+			aDst[i] = catmullrom(f / (float)FIXPOINT_FRAC_MUL, aSrc[p - 3], aSrc[p - 2], aSrc[p - 1], aSrc[p]);
 		}
 	}
 
@@ -1007,10 +1019,52 @@ namespace SoLoud
 		int aDstSampleCount,
 		int aStepFixed)
 	{
-		int i;
+		int i = 0;
 		int pos = aSrcOffset;
 
-		for (i = 0; i < aDstSampleCount; i++, pos += aStepFixed)
+#if defined(SOLOUD_SSE_INTRINSICS)
+		// Head: only output samples with p == 0 read the previous block's
+		// last sample. The read position advances monotonically, so this is
+		// a contiguous run; everything after it reads within aSrc.
+		while (i < aDstSampleCount && (pos >> FIXPOINT_FRAC_BITS) == 0)
+		{
+			int f = pos & FIXPOINT_FRAC_MASK;
+			float s1 = aSrc1[SAMPLE_GRANULARITY - 1];
+			float s2 = aSrc[0];
+			aDst[i] = s1 + (s2 - s1) * f * (1 / (float)FIXPOINT_FRAC_MUL);
+			i++;
+			pos += aStepFixed;
+		}
+
+		// Main batch: 4 output samples per iteration. Each lane performs the
+		// exact same float operations in the same order as the scalar loop,
+		// so the result is bit-identical.
+		if (i + 4 <= aDstSampleCount)
+		{
+			const float scale = 1 / (float)FIXPOINT_FRAC_MUL;
+			const __m128 cscale = _mm_load_ps1(&scale);
+			const __m128i mask = _mm_set1_epi32(FIXPOINT_FRAC_MASK);
+			__m128i posv = _mm_set_epi32(pos + 3 * aStepFixed, pos + 2 * aStepFixed, pos + aStepFixed, pos);
+			const __m128i step4 = _mm_set1_epi32(aStepFixed * 4);
+			alignas(16) int pbuf[4];
+			for (; i + 4 <= aDstSampleCount; i += 4)
+			{
+				__m128i pv = _mm_srai_epi32(posv, FIXPOINT_FRAC_BITS);
+				__m128i fv = _mm_and_si128(posv, mask);
+				_mm_store_si128((__m128i*)pbuf, pv);
+				__m128 s1v = _mm_set_ps(aSrc[pbuf[3] - 1], aSrc[pbuf[2] - 1], aSrc[pbuf[1] - 1], aSrc[pbuf[0] - 1]);
+				__m128 s2v = _mm_set_ps(aSrc[pbuf[3]], aSrc[pbuf[2]], aSrc[pbuf[1]], aSrc[pbuf[0]]);
+				__m128 ff = _mm_cvtepi32_ps(fv);
+				__m128 res = _mm_add_ps(s1v, _mm_mul_ps(_mm_mul_ps(_mm_sub_ps(s2v, s1v), ff), cscale));
+				_mm_storeu_ps(aDst + i, res);
+				posv = _mm_add_epi32(posv, step4);
+			}
+			// lane 0 holds the read position for output sample i
+			pos = _mm_cvtsi128_si32(posv);
+		}
+#endif
+
+		for (; i < aDstSampleCount; i++, pos += aStepFixed)
 		{
 			int p = pos >> FIXPOINT_FRAC_BITS;
 			int f = pos & FIXPOINT_FRAC_MASK;
@@ -1072,6 +1126,22 @@ namespace SoLoud
 		switch (aChannels)
 		{
 		case 1: // Target is mono. Sum everything. (1->1, 2->1, 4->1, 6->1, 8->1)
+			if (pani[0] == 0.0f)
+			{
+				// Constant gain: coefficient is buffer-invariant, hoist it out
+				// and run a branch-free, vectorizable loop. Bit-exact with the
+				// ramping path since adding a zero increment is a no-op.
+				float g = pan[0];
+				for (j = 0, ofs = 0; j < aVoice->mChannels; j++, ofs += aBufferSize)
+				{
+					const float *s = aScratch + ofs;
+					for (k = 0; k < aSamplesToRead; k++)
+					{
+						aBuffer[k] += s[k] * g;
+					}
+				}
+				break;
+			}
 			for (j = 0, ofs = 0; j < aVoice->mChannels; j++, ofs += aBufferSize)
 			{
 				pan[0] = aVoice->mCurrentChannelVolume[0];
@@ -1131,6 +1201,36 @@ namespace SoLoud
 				}
 				break;
 			case 2: // 2->2
+				if (pani[0] == 0.0f && pani[1] == 0.0f)
+				{
+					// Constant gain: coefficients are buffer-invariant, hoist them
+					// out and run a branch-free loop. Bit-exact with the ramping
+					// path since adding a zero increment is a no-op.
+					float g0 = pan[0];
+					float g1 = pan[1];
+					const float *s0 = aScratch;
+					const float *s1 = aScratch + aBufferSize;
+					float *d0 = aBuffer;
+					float *d1 = aBuffer + aBufferSize;
+					j = 0;
+#if defined(SOLOUD_SSE_INTRINSICS)
+					{
+						__m128 vg0 = _mm_load_ps1(&g0);
+						__m128 vg1 = _mm_load_ps1(&g1);
+						for (; j + 4 <= aSamplesToRead; j += 4)
+						{
+							_mm_store_ps(d0 + j, _mm_add_ps(_mm_load_ps(d0 + j), _mm_mul_ps(_mm_load_ps(s0 + j), vg0)));
+							_mm_store_ps(d1 + j, _mm_add_ps(_mm_load_ps(d1 + j), _mm_mul_ps(_mm_load_ps(s1 + j), vg1)));
+						}
+					}
+#endif
+					for (; j < aSamplesToRead; j++)
+					{
+						d0[j] += s0[j] * g0;
+						d1[j] += s1[j] * g1;
+					}
+					break;
+				}
 #if defined(SOLOUD_SSE_INTRINSICS)
 				{
 					int c = 0;
@@ -1196,6 +1296,37 @@ namespace SoLoud
 #endif
 				break;
 			case 1: // 1->2
+				if (pani[0] == 0.0f && pani[1] == 0.0f)
+				{
+					// Constant gain: coefficients are buffer-invariant, hoist them
+					// out and run a branch-free loop. Bit-exact with the ramping
+					// path since adding a zero increment is a no-op.
+					float g0 = pan[0];
+					float g1 = pan[1];
+					const float *s = aScratch;
+					float *d0 = aBuffer;
+					float *d1 = aBuffer + aBufferSize;
+					j = 0;
+#if defined(SOLOUD_SSE_INTRINSICS)
+					{
+						__m128 vg0 = _mm_load_ps1(&g0);
+						__m128 vg1 = _mm_load_ps1(&g1);
+						for (; j + 4 <= aSamplesToRead; j += 4)
+						{
+							__m128 v = _mm_load_ps(s + j);
+							_mm_store_ps(d0 + j, _mm_add_ps(_mm_load_ps(d0 + j), _mm_mul_ps(v, vg0)));
+							_mm_store_ps(d1 + j, _mm_add_ps(_mm_load_ps(d1 + j), _mm_mul_ps(v, vg1)));
+						}
+					}
+#endif
+					for (; j < aSamplesToRead; j++)
+					{
+						float v = s[j];
+						d0[j] += v * g0;
+						d1[j] += v * g1;
+					}
+					break;
+				}
 #if defined(SOLOUD_SSE_INTRINSICS)
 				{
 					int c = 0;
@@ -1603,12 +1734,9 @@ namespace SoLoud
 	{
 		unsigned int i, j;
 		// Clear accumulation buffer
-		for (i = 0; i < aSamplesToRead; i++)
+		for (j = 0; j < aChannels; j++)
 		{
-			for (j = 0; j < aChannels; j++)
-			{
-				aBuffer[i + j * aBufferSize] = 0;
-			}
+			memset(aBuffer + j * aBufferSize, 0, sizeof(float) * aSamplesToRead);
 		}
 
 		// Accumulate sound sources		
@@ -1744,42 +1872,42 @@ namespace SoLoud
 					// Call resampler to generate the samples, once per channel
 					if (writesamples)
 					{
-						for (j = 0; j < voice->mChannels; j++)
+						switch (aResampler)
 						{
-							switch (aResampler)
+						case RESAMPLER_POINT:
+							for (j = 0; j < voice->mChannels; j++)
 							{
-							case RESAMPLER_POINT:
 								resample_point(voice->mResampleData[0] + SAMPLE_GRANULARITY * j,
 									voice->mResampleData[1] + SAMPLE_GRANULARITY * j,
 									aScratch + aBufferSize * j + outofs,
 									voice->mSrcOffset,
 									writesamples,
-									/*voice->mSamplerate,
-									aSamplerate,*/
 									step_fixed);
-								break;
-							case RESAMPLER_CATMULLROM:
+							}
+							break;
+						case RESAMPLER_CATMULLROM:
+							for (j = 0; j < voice->mChannels; j++)
+							{
 								resample_catmullrom(voice->mResampleData[0] + SAMPLE_GRANULARITY * j,
 									voice->mResampleData[1] + SAMPLE_GRANULARITY * j,
 									aScratch + aBufferSize * j + outofs,
 									voice->mSrcOffset,
 									writesamples,
-									/*voice->mSamplerate,
-									aSamplerate,*/
 									step_fixed);
-								break;
-							default:
-							//case RESAMPLER_LINEAR:
+							}
+							break;
+						default:
+						//case RESAMPLER_LINEAR:
+							for (j = 0; j < voice->mChannels; j++)
+							{
 								resample_linear(voice->mResampleData[0] + SAMPLE_GRANULARITY * j,
 									voice->mResampleData[1] + SAMPLE_GRANULARITY * j,
 									aScratch + aBufferSize * j + outofs,
 									voice->mSrcOffset,
 									writesamples,
-									/*voice->mSamplerate,
-									aSamplerate,*/
 									step_fixed);
-								break;
 							}
+							break;
 						}
 					}
 
